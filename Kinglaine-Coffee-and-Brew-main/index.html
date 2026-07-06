@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kinglaine POS | Order Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugin s=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "on-error-container": "#93000a",
+          "error-container": "#ffdad6",
+          "on-surface": "#1d1c0d",
+          background: "#fefae0",
+          "outline-variant": "#d3c3bd",
+          "on-surface-variant": "#4f4540",
+          "on-secondary-container": "#7a532a",
+          error: "#ba1a1a",
+          success: "#2e7d32",
+          warning: "#b8860b",
+          secondary: "#7d562d",
+          "on-secondary": "#ffffff",
+          primary: "#25160e",
+          "secondary-container": "#ffca98",
+          "surface-container-lowest": "#ffffff",
+          outline: "#81756f",
+          "on-primary": "#ffffff",
+          surface: "#fefae0",
+          "surface-container-low": "#f8f4db",
+          "surface-container": "#f2efd5",
+          "surface-container-high": "#ede9cf",
+          "surface-container-highest": "#e7e3ca"
+        }
+      }
+    }
+  }
+</script>
+<style>
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .view { display: none; }
+  .view.active { display: flex; }
+  .product-btn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .product-btn:active { transform: scale(0.96); }
+  .cat-btn.selected { background-color: #25160e; color: #fff; }
+  .table-card { transition: all 0.2s ease; }
+  .table-card:hover { transform: translateY(-2px); }
+  .table-card.occupied { border-color: #7d562d; background: #fff7ec; }
+  .table-card.open { border-color: #c9c2b3; }
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #d3c3bd; border-radius: 10px; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(37,22,14,0.45); z-index: 200; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); opacity: 0; transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1); z-index: 9999; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast.error-toast .toast-inner { background: #ba1a1a; }
+  .size-pill.selected { background: #25160e; color: #fff; }
+  .pay-btn.selected { border-color: #25160e; background: #fef3e8; }
+  .badge-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .role-hidden { display: none !important; }
+  .spinner { border: 3px solid rgba(0,0,0,0.1); border-top-color: #25160e; border-radius: 50%; width: 28px; height: 28px; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #81756f; transition: all 0.15s ease; }
+  .pin-dot.filled { background: #25160e; border-color: #25160e; }
+  .stock-pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+</style>
+</head>
+<body class="bg-surface text-on-surface h-screen overflow-hidden">
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast">
+  <div class="toast-inner bg-primary text-white px-6 py-3 rounded-full font-semibold text-sm flex items-center gap-2 shadow-2xl">
+    <span class="material-symbols-outlined text-base" id="toast-icon">check</span>
+    <span id="toast-msg">Done</span>
+  </div>
+</div>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div class="view active flex-col items-center justify-center h-screen bg-gradient-to-br from-primary to-[#3c2a21]" id="view-login">
+  <div class="bg-surface-container-lowest rounded-3xl shadow-2xl p-10 w-[380px]">
+    <div class="text-center mb-8">
+      <span class="material-symbols-outlined text-4xl text-secondary mb-2">point_of_sale</span>
+      <h1 class="font-bold text-2xl text-primary">Kinglaine POS</h1>
+      <p class="text-sm text-on-surface-variant">Sign in to start your shift</p>
+    </div>
+    <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2 block">Username</label>
+    <input id="login-username" type="text" autocomplete="username" placeholder="e.g. cashier" class="w-full bg-surface-container rounded-xl px-4 py-3 mb-5 border border-outline-variant/30 outline-none focus:ring-2 focus:ring-secondary/30 text-sm"/>
+
+    <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2 block">PIN</label>
+    <input id="login-pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="••••" class="w-full bg-surface-container rounded-xl px-4 py-3 mb-2 border border-outline-variant/30 outline-none focus:ring-2 focus:ring-secondary/30 text-sm tracking-widest" onkeydown="if(event.key==='Enter') attemptLogin()"/>
+    <p id="login-error" class="text-error text-xs font-semibold mb-4 h-4"></p>
+
+    <button onclick="attemptLogin()" id="login-btn" class="w-full py-3.5 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all">
+      <span id="login-btn-label">Sign In</span>
+    </button>
+
+    <p class="text-center text-xs text-on-surface-variant mt-6">Demo: <strong>admin</strong>/1234 or <strong>cashier</strong>/0000</p>
+  </div>
+</div>
+
+<!-- ===== APP SHELL ===== -->
+<div class="h-screen flex flex-col view" id="view-app">
+
+  <!-- TOP BAR -->
+  <header class="h-16 flex-shrink-0 bg-primary text-white flex items-center justify-between px-6 shadow-md z-30">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-2xl text-secondary-container">point_of_sale</span>
+      <span class="font-bold text-lg tracking-tight">Kinglaine POS</span>
+    </div>
+    <div class="flex items-center gap-5">
+      <button onclick="showView('tables')" id="nav-tables" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+        <span class="material-symbols-outlined text-lg">table_restaurant</span> Tables
+      </button>
+      <button onclick="showView('order')" id="nav-order" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+        <span class="material-symbols-outlined text-lg">shopping_cart</span> Order
+      </button>
+      <button onclick="showView('inventory')" id="nav-inventory" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+        <span class="material-symbols-outlined text-lg">inventory_2</span> Inventory
+      </button>
+      <button onclick="showView('products')" id="nav-products" class="nav-top admin-only flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+        <span class="material-symbols-outlined text-lg">category</span> Products
+      </button>
+      <button onclick="showView('reports')" id="nav-reports" class="nav-top admin-only flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+        <span class="material-symbols-outlined text-lg">bar_chart</span> Reports
+      </button>
+      <div class="h-8 w-px bg-white/20"></div>
+      <div class="flex items-center gap-2 text-sm">
+        <span class="material-symbols-outlined text-lg text-secondary-container">badge</span>
+        <span class="font-medium" id="current-user-label">—</span>
+      </div>
+      <div class="text-sm font-mono text-white/70" id="clock">--:--</div>
+      <button onclick="logout()" class="hover:bg-white/10 p-2 rounded-lg" title="Log out"><span class="material-symbols-outlined text-lg">logout</span></button>
+    </div>
+  </header>
+
+  <!-- ===================== VIEW: TABLES ===================== -->
+  <div class="view flex-col flex-1 overflow-hidden" id="view-tables">
+    <div class="flex justify-between items-center px-8 py-5 flex-shrink-0 border-b border-outline-variant/30">
+      <div>
+        <h1 class="font-bold text-2xl text-primary">Floor Overview</h1>
+        <p class="text-sm text-on-surface-variant">Select a table to start or continue an order</p>
+      </div>
+      <div class="flex items-center gap-4 text-sm">
+        <div class="flex items-center gap-2"><span class="badge-dot bg-outline-variant"></span> Open</div>
+        <div class="flex items-center gap-2"><span class="badge-dot bg-secondary"></span> Occupied</div>
+        <button onclick="startTakeoutOrder()" class="ml-4 flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">shopping_bag</span> New Takeout / Counter Order
+        </button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-5" id="tables-grid"></div>
+    </div>
+  </div>
+
+  <!-- ===================== VIEW: ORDER (main POS) ===================== -->
+  <div class="view flex-1 overflow-hidden" id="view-order">
+    <div class="flex-1 flex flex-col overflow-hidden border-r border-outline-variant/30">
+      <div class="flex items-center gap-2 px-6 py-4 flex-shrink-0 overflow-x-auto border-b border-outline-variant/20" id="category-bar"></div>
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-6">
+        <div id="product-grid-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4" id="product-grid"></div>
+      </div>
+    </div>
+
+    <div class="w-[400px] flex-shrink-0 flex flex-col bg-surface-container-low">
+      <div class="px-6 py-4 border-b border-outline-variant/30 flex justify-between items-center flex-shrink-0">
+        <div>
+          <h2 class="font-bold text-lg text-primary" id="ticket-title">Counter Order</h2>
+          <p class="text-xs text-on-surface-variant" id="ticket-subtitle">New ticket</p>
+        </div>
+        <button onclick="showView('tables')" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">arrow_back</span> Tables
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto custom-scrollbar px-4 py-3" id="ticket-items"></div>
+      <div id="ticket-empty" class="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8" style="display:none">
+        <span class="material-symbols-outlined text-5xl text-outline-variant">receipt_long</span>
+        <p class="text-sm text-on-surface-variant">No items yet.<br/>Tap a product to add it to the ticket.</p>
+      </div>
+
+      <div class="border-t border-outline-variant/30 px-5 py-4 flex-shrink-0">
+        <div class="flex justify-between text-sm text-on-surface-variant mb-1"><span>Subtotal</span><span id="t-subtotal">₱0.00</span></div>
+        <div class="flex justify-between text-sm text-on-surface-variant mb-1"><span>Tax (12% VAT)</span><span id="t-tax">₱0.00</span></div>
+        <div class="flex justify-between text-sm text-on-surface-variant mb-3">
+          <span>Discount</span>
+          <button onclick="openDiscountModal()" class="text-secondary font-semibold hover:underline" id="t-discount-label">Add discount</button>
+        </div>
+        <div class="h-px bg-outline-variant/30 my-2"></div>
+        <div class="flex justify-between text-xl font-bold text-primary mb-4"><span>Total</span><span id="t-total">₱0.00</span></div>
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="holdTicket()" class="py-3 rounded-xl border-2 border-outline-variant font-semibold text-sm text-on-surface-variant hover:bg-surface-container transition-all active:scale-95">Send / Hold</button>
+          <button onclick="openPaymentModal()" class="py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">Charge</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== VIEW: INVENTORY ===================== -->
+  <div class="view flex-col flex-1 overflow-hidden" id="view-inventory">
+    <div class="px-8 py-5 flex-shrink-0 border-b border-outline-variant/30 flex justify-between items-center">
+      <div>
+        <h1 class="font-bold text-2xl text-primary">Inventory</h1>
+        <p class="text-sm text-on-surface-variant">Stock on hand across all products</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm bg-error-container text-on-error-container px-3 py-1.5 rounded-full" id="low-stock-badge" style="display:none">
+          <span class="material-symbols-outlined text-base">warning</span> <span id="low-stock-count">0</span> low stock
+        </div>
+        <button onclick="loadInventory()" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">refresh</span> Refresh
+        </button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+      <div id="inventory-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+      <table class="w-full text-left" id="inventory-table" style="display:none">
+        <thead>
+          <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+            <th class="py-3 pr-4">Product</th>
+            <th class="py-3 pr-4">Category</th>
+            <th class="py-3 pr-4">On Hand</th>
+            <th class="py-3 pr-4">Status</th>
+            <th class="py-3 pr-4 admin-only">Restock</th>
+          </tr>
+        </thead>
+        <tbody id="inventory-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================== VIEW: PRODUCTS (admin only) ===================== -->
+  <div class="view flex-col flex-1 overflow-hidden" id="view-products">
+    <div class="px-8 py-5 flex-shrink-0 border-b border-outline-variant/30 flex justify-between items-center">
+      <div>
+        <h1 class="font-bold text-2xl text-primary">Product Management</h1>
+        <p class="text-sm text-on-surface-variant">Add, edit, or remove menu items</p>
+      </div>
+      <button onclick="openProductFormModal(null)" class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+        <span class="material-symbols-outlined text-lg">add</span> New Product
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+      <div id="products-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+      <table class="w-full text-left" id="products-table" style="display:none">
+        <thead>
+          <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+            <th class="py-3 pr-4">Image</th>
+            <th class="py-3 pr-4">Name</th>
+            <th class="py-3 pr-4">Category</th>
+            <th class="py-3 pr-4">Price</th>
+            <th class="py-3 pr-4">Has Options</th>
+            <th class="py-3 pr-4">Status</th>
+            <th class="py-3 pr-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="products-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================== VIEW: REPORTS (admin only) ===================== -->
+  <div class="view flex-col flex-1 overflow-hidden" id="view-reports">
+    <div class="px-8 py-5 flex-shrink-0 border-b border-outline-variant/30 flex justify-between items-center">
+      <div>
+        <h1 class="font-bold text-2xl text-primary">Reports</h1>
+        <p class="text-sm text-on-surface-variant">Sales, inventory, and transaction history</p>
+      </div>
+      <div class="flex items-center gap-2 bg-surface-container-low rounded-xl p-1" id="report-range-tabs">
+        <button onclick="setReportRange('today')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="today">Today</button>
+        <button onclick="setReportRange('week')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="week">7 Days</button>
+        <button onclick="setReportRange('all')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="all">All Time</button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+      <div id="reports-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+      <div id="reports-content" style="display:none">
+        <div class="grid grid-cols-4 gap-5 mb-8">
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Gross Sales</p>
+            <p class="text-3xl font-bold text-primary" id="rep-gross">₱0.00</p>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Transactions</p>
+            <p class="text-3xl font-bold text-primary" id="rep-orders">0</p>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Avg. Ticket</p>
+            <p class="text-3xl font-bold text-primary" id="rep-avg">₱0.00</p>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Items Sold</p>
+            <p class="text-3xl font-bold text-primary" id="rep-items">0</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-8">
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <h3 class="font-bold text-primary mb-4">Top Selling Items</h3>
+            <div id="rep-top-items" class="space-y-3"></div>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <h3 class="font-bold text-primary mb-4">Payment Method Breakdown</h3>
+            <div id="rep-payment-breakdown" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+          <h3 class="font-bold text-primary mb-4">Transaction Log</h3>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
+                <th class="py-2 pr-4">Receipt #</th>
+                <th class="py-2 pr-4">Date/Time</th>
+                <th class="py-2 pr-4">Type</th>
+                <th class="py-2 pr-4">Items</th>
+                <th class="py-2 pr-4">Method</th>
+                <th class="py-2 pr-4 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="rep-transaction-log"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== MODAL: ITEM CUSTOMIZATION ===== -->
+<div class="modal-overlay" id="modal-customize">
+  <div class="bg-surface-container-lowest rounded-2xl w-[480px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-start">
+      <div>
+        <h3 class="font-bold text-xl text-primary" id="cust-name">Item Name</h3>
+        <p class="text-sm text-on-surface-variant" id="cust-base-price">₱0.00</p>
+      </div>
+      <button onclick="closeCustomizeModal()" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 space-y-5">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Size</p>
+        <div class="grid grid-cols-3 gap-2" id="cust-size-options"></div>
+      </div>
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Milk</p>
+        <div class="flex flex-wrap gap-2" id="cust-milk-options"></div>
+      </div>
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Add-ons</p>
+        <div class="space-y-2" id="cust-addons"></div>
+      </div>
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Note</p>
+        <input id="cust-note" type="text" placeholder="e.g. less ice, no foam..." class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 focus:ring-2 focus:ring-secondary/30 outline-none"/>
+      </div>
+    </div>
+    <div class="p-6 border-t border-outline-variant/20 flex items-center justify-between gap-4">
+      <div class="flex items-center bg-surface-container rounded-full p-1 border border-outline-variant">
+        <button onclick="custQtyChange(-1)" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white active:scale-90"><span class="material-symbols-outlined text-base">remove</span></button>
+        <span class="w-10 text-center font-bold" id="cust-qty">1</span>
+        <button onclick="custQtyChange(1)" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white active:scale-90"><span class="material-symbols-outlined text-base">add</span></button>
+      </div>
+      <button onclick="confirmAddCustomItem()" class="flex-1 py-3 bg-primary text-white rounded-xl font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all">
+        Add to Ticket — <span id="cust-total-price">₱0.00</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: DISCOUNT ===== -->
+<div class="modal-overlay" id="modal-discount">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-lg text-primary">Apply Discount</h3>
+      <button onclick="closeModal('modal-discount')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-4">
+      <button onclick="setDiscount(0)" class="py-3 rounded-xl border-2 border-outline-variant font-semibold text-sm hover:border-secondary transition-all">None</button>
+      <button onclick="setDiscount(0.05)" class="py-3 rounded-xl border-2 border-outline-variant font-semibold text-sm hover:border-secondary transition-all">5% Senior/PWD</button>
+      <button onclick="setDiscount(0.10)" class="py-3 rounded-xl border-2 border-outline-variant font-semibold text-sm hover:border-secondary transition-all">10% Promo</button>
+      <button onclick="setDiscount(0.20)" class="py-3 rounded-xl border-2 border-outline-variant font-semibold text-sm hover:border-secondary transition-all">20% Employee</button>
+    </div>
+    <div>
+      <label class="text-xs font-semibold text-on-surface-variant block mb-1">Custom % discount</label>
+      <div class="flex gap-2">
+        <input id="custom-discount-input" type="number" min="0" max="100" placeholder="0" class="flex-1 bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+        <button onclick="setCustomDiscount()" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: PAYMENT ===== -->
+<div class="modal-overlay" id="modal-payment">
+  <div class="bg-surface-container-lowest rounded-2xl w-[420px] shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">Charge</h3>
+      <button onclick="closeModal('modal-payment')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6">
+      <div class="text-center mb-6">
+        <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-1">Amount Due</p>
+        <p class="text-4xl font-bold text-primary" id="pay-amount-due">₱0.00</p>
+      </div>
+      <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Payment Method</p>
+      <div class="grid grid-cols-2 gap-3 mb-6">
+        <button onclick="selectPayMethod('cash', this)" class="pay-btn selected flex flex-col items-center gap-1 p-4 rounded-xl border-2 border-outline-variant hover:border-secondary transition-all">
+          <span class="material-symbols-outlined">payments</span><span class="text-xs font-semibold">Cash</span>
+        </button>
+        <button onclick="selectPayMethod('gcash', this)" class="pay-btn flex flex-col items-center gap-1 p-4 rounded-xl border-2 border-outline-variant hover:border-secondary transition-all">
+          <span class="material-symbols-outlined">qr_code_2</span><span class="text-xs font-semibold">GCash</span>
+        </button>
+      </div>
+      <div id="cash-tender-section">
+        <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Cash Tendered</p>
+        <input id="cash-tendered-input" type="number" placeholder="0.00" oninput="updateChange()" class="w-full bg-surface-container rounded-lg px-4 py-3 text-lg font-semibold border border-outline-variant/30 outline-none mb-2"/>
+        <div class="flex gap-2 mb-4">
+          <button onclick="quickCash(50)" class="flex-1 py-2 rounded-lg bg-surface-container text-sm font-semibold hover:bg-surface-container-high">₱50</button>
+          <button onclick="quickCash(100)" class="flex-1 py-2 rounded-lg bg-surface-container text-sm font-semibold hover:bg-surface-container-high">₱100</button>
+          <button onclick="quickCash(500)" class="flex-1 py-2 rounded-lg bg-surface-container text-sm font-semibold hover:bg-surface-container-high">₱500</button>
+          <button onclick="quickCash(1000)" class="flex-1 py-2 rounded-lg bg-surface-container text-sm font-semibold hover:bg-surface-container-high">₱1000</button>
+        </div>
+        <div class="flex justify-between text-sm font-semibold">
+          <span class="text-on-surface-variant">Change</span>
+          <span id="change-due" class="text-success">₱0.00</span>
+        </div>
+      </div>
+      <div id="gcash-section" style="display:none">
+        <div class="bg-surface-container rounded-xl p-6 text-center">
+          <span class="material-symbols-outlined text-5xl text-secondary mb-2">qr_code_2</span>
+          <p class="text-sm text-on-surface-variant">Show this amount to the customer to confirm in their GCash app, then mark as paid.</p>
+        </div>
+      </div>
+    </div>
+    <div class="p-6 border-t border-outline-variant/20">
+      <button onclick="completePayment()" id="complete-payment-btn" class="w-full py-4 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all">
+        <span class="material-symbols-outlined">check_circle</span> <span>Complete Payment</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: RECEIPT ===== -->
+<div class="modal-overlay" id="modal-receipt">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-8 text-center">
+    <span class="material-symbols-outlined text-6xl text-success mb-4">check_circle</span>
+    <h3 class="font-bold text-2xl text-primary mb-2">Payment Complete</h3>
+    <p class="text-sm text-on-surface-variant mb-6" id="receipt-summary">Order total ₱0.00 paid via Cash.</p>
+    <div class="bg-surface-container rounded-xl p-4 text-left text-sm mb-6 font-mono" id="receipt-detail"></div>
+    <button onclick="closeReceiptAndReset()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">New Order</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: PRODUCT FORM (add/edit) ===== -->
+<div class="modal-overlay" id="modal-product-form">
+  <div class="bg-surface-container-lowest rounded-2xl w-[440px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary" id="product-form-title">New Product</h3>
+      <button onclick="closeModal('modal-product-form')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input type="hidden" id="pf-id"/>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Name</label>
+        <input id="pf-name" type="text" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Category</label>
+        <select id="pf-category" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none">
+          <option value="coffee">Coffee</option>
+          <option value="tea">Tea</option>
+          <option value="bakery">Bakery</option>
+          <option value="merch">Merch</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Base Price (₱)</label>
+        <input id="pf-price" type="number" min="0" step="0.01" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Image URL</label>
+        <input id="pf-image" type="text" placeholder="https://..." class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Starting Stock (new products only)</label>
+        <input id="pf-stock" type="number" min="0" step="1" value="0" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input id="pf-has-options" type="checkbox" class="w-4 h-4 accent-secondary"/>
+        <span class="text-sm font-medium">Has size/milk/add-on options</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input id="pf-is-active" type="checkbox" checked class="w-4 h-4 accent-secondary"/>
+        <span class="text-sm font-medium">Active (visible in POS)</span>
+      </label>
+    </div>
+    <div class="p-6 border-t border-outline-variant/20">
+      <button onclick="saveProductForm()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: RESTOCK ===== -->
+<div class="modal-overlay" id="modal-restock">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-lg text-primary">Restock <span id="restock-product-name"></span></h3>
+      <button onclick="closeModal('modal-restock')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <input type="hidden" id="restock-product-id"/>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Quantity to add</label>
+    <input id="restock-qty" type="number" min="1" step="1" placeholder="e.g. 50" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-4"/>
+    <button onclick="confirmRestock()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Add Stock</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: CONFIRM DELETE ===== -->
+<div class="modal-overlay" id="modal-confirm-delete">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6 text-center">
+    <span class="material-symbols-outlined text-5xl text-error mb-3">warning</span>
+    <h3 class="font-bold text-lg text-primary mb-2">Delete <span id="delete-product-name"></span>?</h3>
+    <p class="text-sm text-on-surface-variant mb-6">This hides the product from the POS catalog. Past sales records are kept.</p>
+    <input type="hidden" id="delete-product-id"/>
+    <div class="grid grid-cols-2 gap-3">
+      <button onclick="closeModal('modal-confirm-delete')" class="py-3 rounded-xl border-2 border-outline-variant font-semibold text-sm">Cancel</button>
+      <button onclick="confirmDeleteProduct()" class="py-3 rounded-xl bg-error text-white font-semibold text-sm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================================================================
+// SUPABASE CLIENT
+// ===================================================================
+const SUPABASE_URL = 'https://twadsnxsmhpgegmsfqrp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3YWRzbnhzbWhwZ2VnbXNmcXJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDM2MTQsImV4cCI6MjA5NzMxOTYxNH0.lhCObIfo4IFeDT5K8hAq_9_EqOAq5G53vNhux2fVtcw';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const TAX_RATE = 0.12;
+const CURRENCY = '₱';
+const SIZE_OPTIONS = [
+  { id:'small', label:'S · 12oz', add:-0.50 },
+  { id:'medium', label:'M · 16oz', add:0 },
+  { id:'large', label:'L · 20oz', add:0.75 }
+];
+const MILK_OPTIONS = ['Whole Milk','Oat Milk','Almond Milk','Skim Milk'];
+const ADDON_OPTIONS = [
+  { id:'espresso', label:'Extra Espresso Shot', price:0.95 },
+  { id:'caramel', label:'Caramel Drizzle', price:0.60 }
+];
+const CATEGORIES = [
+  { id:'coffee', label:'Coffee', icon:'coffee' },
+  { id:'tea', label:'Tea', icon:'local_drink' },
+  { id:'bakery', label:'Bakery', icon:'bakery_dining' },
+  { id:'merch', label:'Merch', icon:'shopping_bag' }
+];
+const TABLES = Array.from({length: 10}, (_, i) => ({ id: 'T' + (i+1), label: 'Table ' + (i+1) }));
+
+// ===================================================================
+// AUTH STATE
+// ===================================================================
+let currentUser = null; // { id, username, full_name, role }
+
+async function hashPin(pin) {
+  const enc = new TextEncoder().encode(pin);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function attemptLogin() {
+  const username = document.getElementById('login-username').value.trim().toLowerCase();
+  const pin = document.getElementById('login-pin').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!username || !pin) { errEl.textContent = 'Enter both username and PIN.'; return; }
+
+  setLoginLoading(true);
+  try {
+    const { data, error } = await sb.from('users').select('*').eq('username', username).eq('is_active', true).maybeSingle();
+    if (error) throw error;
+    if (!data) { errEl.textContent = 'Invalid username or PIN.'; setLoginLoading(false); return; }
+
+    const hashed = await hashPin(pin);
+    if (hashed !== data.pin_hash) { errEl.textContent = 'Invalid username or PIN.'; setLoginLoading(false); return; }
+
+    currentUser = { id: data.id, username: data.username, full_name: data.full_name, role: data.role };
+    enterApp();
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = 'Could not reach the server. Check your connection.';
+  } finally {
+    setLoginLoading(false);
+  }
+}
+
+function setLoginLoading(loading) {
+  document.getElementById('login-btn-label').textContent = loading ? 'Signing in…' : 'Sign In';
+  document.getElementById('login-btn').disabled = loading;
+}
+
+function enterApp() {
+  document.getElementById('view-login').classList.remove('active');
+  document.getElementById('view-app').classList.add('active');
+  document.getElementById('current-user-label').textContent = currentUser.full_name + ' (' + currentUser.role + ')';
+  applyRoleVisibility();
+  tickClock();
+  showView('tables');
+}
+
+function applyRoleVisibility() {
+  const isAdmin = currentUser.role === 'admin';
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.classList.toggle('role-hidden', !isAdmin);
+  });
+}
+
+function logout() {
+  currentUser = null;
+  activeOrderKey = null;
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-pin').value = '';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('view-app').classList.remove('active');
+  document.getElementById('view-login').classList.add('active');
+}
+
+// ===================================================================
+// APP STATE
+// ===================================================================
+let productsCache = [];
+let inventoryCache = {}; // product_id -> { quantity_on_hand, low_stock_threshold }
+let tableOrders = {};
+let activeOrderKey = null;
+let takeoutCounter = 1;
+let currentCategory = 'coffee';
+let customizeProduct = null;
+let customQty = 1;
+let customSize = 'medium';
+let customMilk = 'Whole Milk';
+let payMethod = 'cash';
+let currentReportRange = 'today';
+
+function newTicket() { return { items: [], discountPct: 0 }; }
+function getActiveTicket() {
+  if (!activeOrderKey) return null;
+  if (!tableOrders[activeOrderKey]) tableOrders[activeOrderKey] = newTicket();
+  return tableOrders[activeOrderKey];
+}
+
+// ===================================================================
+// NAVIGATION
+// ===================================================================
+function showView(view) {
+  document.querySelectorAll('#view-app .view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.nav-top').forEach(n => n.classList.remove('bg-white/10'));
+  const navEl = document.getElementById('nav-' + view);
+  if (navEl) navEl.classList.add('bg-white/10');
+
+  if ((view === 'products' || view === 'reports') && currentUser.role !== 'admin') {
+    showToast('Admin access required', 'lock');
+    showView('tables');
+    return;
+  }
+
+  if (view === 'tables') renderTables();
+  if (view === 'order') { renderCategoryBar(); loadProductsAndRenderGrid(); renderTicket(); }
+  if (view === 'inventory') loadInventory();
+  if (view === 'products') loadProductsManagement();
+  if (view === 'reports') loadReports();
+}
+
+function tickClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+}
+setInterval(tickClock, 1000);
+
+let toastTimer;
+function showToast(msg, icon='check', isError=false) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = icon;
+  t.classList.toggle('error-toast', isError);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function fmt(n) { return CURRENCY + Number(n).toFixed(2); }
+
+// ===================================================================
+// DATA LOADING: PRODUCTS + INVENTORY
+// ===================================================================
+async function fetchActiveProductsWithStock() {
+  const { data: products, error: pErr } = await sb.from('products').select('*').eq('is_active', true).order('category').order('name');
+  if (pErr) throw pErr;
+  const { data: inv, error: iErr } = await sb.from('inventory').select('*');
+  if (iErr) throw iErr;
+  inventoryCache = {};
+  inv.forEach(row => { inventoryCache[row.product_id] = row; });
+  productsCache = products;
+  return products;
+}
+
+async function loadProductsAndRenderGrid() {
+  document.getElementById('product-grid-loading').style.display = 'flex';
+  document.getElementById('product-grid').style.display = 'none';
+  try {
+    await fetchActiveProductsWithStock();
+    renderProductGrid();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load products', 'error', true);
+  } finally {
+    document.getElementById('product-grid-loading').style.display = 'none';
+    document.getElementById('product-grid').style.display = 'grid';
+  }
+}
+
+// ===================================================================
+// TABLES VIEW
+// ===================================================================
+function renderTables() {
+  const grid = document.getElementById('tables-grid');
+  grid.innerHTML = TABLES.map(t => {
+    const ticket = tableOrders[t.id];
+    const occupied = ticket && ticket.items.length > 0;
+    const count = occupied ? ticket.items.reduce((s,i)=>s+i.qty,0) : 0;
+    const total = occupied ? calcTotals(ticket).total : 0;
+    return `
+      <button onclick="selectTable('${t.id}')" class="table-card ${occupied ? 'occupied' : 'open'} flex flex-col items-start gap-2 p-5 rounded-2xl border-2 bg-surface-container-lowest text-left">
+        <div class="flex justify-between w-full items-center">
+          <span class="font-bold text-lg text-primary">${t.label}</span>
+          <span class="badge-dot ${occupied ? 'bg-secondary' : 'bg-outline-variant'}"></span>
+        </div>
+        ${occupied
+          ? `<p class="text-sm text-on-surface-variant">${count} item${count!==1?'s':''}</p><p class="font-semibold text-secondary">${fmt(total)}</p>`
+          : `<p class="text-sm text-on-surface-variant">Open table</p>`}
+      </button>
+    `;
+  }).join('');
+}
+
+function selectTable(tableId) {
+  activeOrderKey = tableId;
+  if (!tableOrders[tableId]) tableOrders[tableId] = newTicket();
+  showView('order');
+}
+
+function startTakeoutOrder() {
+  const key = 'takeout-' + takeoutCounter++;
+  tableOrders[key] = newTicket();
+  tableOrders[key].isTakeout = true;
+  activeOrderKey = key;
+  showView('order');
+}
+
+function holdTicket() {
+  const ticket = getActiveTicket();
+  if (!ticket || ticket.items.length === 0) { showToast('Nothing to hold', 'error', true); return; }
+  showToast('Order held', 'pending_actions');
+  showView('tables');
+}
+
+// ===================================================================
+// PRODUCT GRID
+// ===================================================================
+function renderCategoryBar() {
+  const bar = document.getElementById('category-bar');
+  bar.innerHTML = CATEGORIES.map(c => `
+    <button onclick="selectCategory('${c.id}')" class="cat-btn ${c.id===currentCategory?'selected':''} flex items-center gap-2 px-5 py-2.5 rounded-full border-2 border-outline-variant font-semibold text-sm flex-shrink-0 transition-all">
+      <span class="material-symbols-outlined text-base">${c.icon}</span> ${c.label}
+    </button>
+  `).join('');
+}
+function selectCategory(cat) { currentCategory = cat; renderCategoryBar(); renderProductGrid(); }
+
+function stockFor(productId) {
+  const row = inventoryCache[productId];
+  return row ? row.quantity_on_hand : 0;
+}
+
+function renderProductGrid() {
+  const grid = document.getElementById('product-grid');
+  const items = productsCache.filter(p => p.category === currentCategory);
+  if (items.length === 0) {
+    grid.innerHTML = `<p class="col-span-full text-sm text-on-surface-variant py-12 text-center">No products in this category yet.</p>`;
+    return;
+  }
+  grid.innerHTML = items.map(p => {
+    const stock = stockFor(p.id);
+    const outOfStock = stock <= 0;
+    return `
+    <button onclick="${outOfStock ? '' : `handleProductTap('${p.id}')`}" ${outOfStock ? 'disabled' : ''} class="product-btn flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/20 text-left shadow-sm hover:shadow-md ${outOfStock ? 'opacity-50 cursor-not-allowed' : ''}">
+      <div class="h-28 bg-surface-container overflow-hidden relative">
+        <img src="${p.image_url || ''}" class="w-full h-full object-cover" alt="${p.name}" onerror="this.style.display='none'"/>
+        ${outOfStock ? `<span class="absolute top-2 right-2 stock-pill bg-error text-white">OUT</span>` : (stock <= (inventoryCache[p.id]?.low_stock_threshold ?? 10) ? `<span class="absolute top-2 right-2 stock-pill bg-warning text-white">LOW</span>` : '')}
+      </div>
+      <div class="p-3">
+        <p class="font-semibold text-sm text-primary leading-snug mb-1">${p.name}</p>
+        <p class="text-secondary font-bold text-sm">${fmt(p.base_price)}</p>
+      </div>
+    </button>
+  `;
+  }).join('');
+}
+
+function handleProductTap(id) {
+  const p = productsCache.find(x => x.id === id);
+  if (!p) return;
+  if (stockFor(id) <= 0) { showToast('Out of stock', 'error', true); return; }
+  if (!activeOrderKey) startTakeoutOrder();
+  if (p.has_options) {
+    openCustomizeModal(p);
+  } else {
+    addItemToTicket({ id: p.id, name: p.name, unitPrice: p.base_price, qty: 1, options: '', img: p.image_url });
+    showToast(p.name + ' added', 'check');
+  }
+}
+
+// ===================================================================
+// CUSTOMIZATION MODAL
+// ===================================================================
+function openCustomizeModal(p) {
+  customizeProduct = p;
+  customQty = 1;
+  customSize = 'medium';
+  customMilk = 'Whole Milk';
+  document.getElementById('cust-name').textContent = p.name;
+  document.getElementById('cust-base-price').textContent = fmt(p.base_price) + ' base price';
+  document.getElementById('cust-qty').textContent = '1';
+  document.getElementById('cust-note').value = '';
+
+  document.getElementById('cust-size-options').innerHTML = SIZE_OPTIONS.map(s => `
+    <button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id==='medium'?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all">${s.label}</button>
+  `).join('');
+
+  document.getElementById('cust-milk-options').innerHTML = MILK_OPTIONS.map((m,i) => `
+    <button onclick="setCustMilk('${m}', this)" class="size-pill ${i===0?'selected':''} px-4 py-2 rounded-full border-2 border-outline-variant text-xs font-semibold transition-all">${m}</button>
+  `).join('');
+
+  document.getElementById('cust-addons').innerHTML = ADDON_OPTIONS.map(a => `
+    <label class="flex items-center justify-between p-3 bg-surface-container rounded-lg cursor-pointer">
+      <span class="text-sm font-medium">${a.label} <span class="text-on-surface-variant">(+${fmt(a.price)})</span></span>
+      <input type="checkbox" class="addon-cb w-4 h-4 accent-secondary" data-addon="${a.id}" onchange="updateCustomPrice()"/>
+    </label>
+  `).join('');
+
+  updateCustomPrice();
+  document.getElementById('modal-customize').classList.add('open');
+}
+function closeCustomizeModal() { document.getElementById('modal-customize').classList.remove('open'); }
+function setCustSize(sizeId, btn) {
+  customSize = sizeId;
+  document.querySelectorAll('#cust-size-options .size-pill').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  updateCustomPrice();
+}
+function setCustMilk(milk, btn) {
+  customMilk = milk;
+  document.querySelectorAll('#cust-milk-options .size-pill').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+function custQtyChange(d) {
+  customQty = Math.max(1, customQty + d);
+  document.getElementById('cust-qty').textContent = customQty;
+  updateCustomPrice();
+}
+function calcCustomUnitPrice() {
+  const sizeAdd = SIZE_OPTIONS.find(s => s.id === customSize)?.add || 0;
+  let addonTotal = 0;
+  document.querySelectorAll('.addon-cb:checked').forEach(cb => {
+    const a = ADDON_OPTIONS.find(x => x.id === cb.dataset.addon);
+    if (a) addonTotal += a.price;
+  });
+  return customizeProduct.base_price + sizeAdd + addonTotal;
+}
+function updateCustomPrice() {
+  if (!customizeProduct) return;
+  document.getElementById('cust-total-price').textContent = fmt(calcCustomUnitPrice() * customQty);
+}
+function confirmAddCustomItem() {
+  const stock = stockFor(customizeProduct.id);
+  if (customQty > stock) { showToast(`Only ${stock} left in stock`, 'error', true); return; }
+  const unit = calcCustomUnitPrice();
+  const sizeLabel = SIZE_OPTIONS.find(s => s.id === customSize)?.label.split(' · ')[0] || '';
+  const opts = [sizeLabel, customMilk];
+  document.querySelectorAll('.addon-cb:checked').forEach(cb => {
+    const a = ADDON_OPTIONS.find(x => x.id === cb.dataset.addon);
+    if (a) opts.push(a.label);
+  });
+  const note = document.getElementById('cust-note').value.trim();
+  if (note) opts.push('Note: ' + note);
+
+  addItemToTicket({ id: customizeProduct.id, name: customizeProduct.name, unitPrice: unit, qty: customQty, options: opts.join(', '), img: customizeProduct.image_url });
+  showToast(customizeProduct.name + ' added', 'check');
+  closeCustomizeModal();
+}
+
+// ===================================================================
+// TICKET LOGIC
+// ===================================================================
+function addItemToTicket(item) {
+  const ticket = getActiveTicket();
+  if (!ticket) return;
+  const key = item.id + '|' + item.options;
+  const existing = ticket.items.find(i => i.key === key);
+  const requestedQty = (existing ? existing.qty : 0) + item.qty;
+  const stock = stockFor(item.id);
+  if (requestedQty > stock) { showToast(`Only ${stock} left in stock`, 'error', true); return; }
+  if (existing) { existing.qty += item.qty; }
+  else { ticket.items.push({ key, ...item }); }
+  renderTicket();
+}
+function changeTicketQty(key, delta) {
+  const ticket = getActiveTicket();
+  if (!ticket) return;
+  const item = ticket.items.find(i => i.key === key);
+  if (!item) return;
+  const newQty = item.qty + delta;
+  if (delta > 0 && newQty > stockFor(item.id)) { showToast('Not enough stock', 'error', true); return; }
+  item.qty = Math.max(1, newQty);
+  renderTicket();
+}
+function removeTicketItem(key) {
+  const ticket = getActiveTicket();
+  if (!ticket) return;
+  ticket.items = ticket.items.filter(i => i.key !== key);
+  renderTicket();
+}
+function calcTotals(ticket) {
+  const subtotal = ticket.items.reduce((s,i) => s + i.unitPrice * i.qty, 0);
+  const discountAmt = subtotal * (ticket.discountPct || 0);
+  const taxable = subtotal - discountAmt;
+  const tax = taxable * TAX_RATE;
+  const total = taxable + tax;
+  return { subtotal, discountAmt, tax, total };
+}
+function renderTicket() {
+  const ticket = getActiveTicket();
+  const titleEl = document.getElementById('ticket-title');
+  const subEl = document.getElementById('ticket-subtitle');
+  if (!ticket) { titleEl.textContent = 'No Active Order'; subEl.textContent = 'Select a table or start takeout'; }
+  else if (activeOrderKey.startsWith('takeout')) { titleEl.textContent = 'Counter Order'; subEl.textContent = 'Takeout / Walk-in'; }
+  else { const t = TABLES.find(x => x.id === activeOrderKey); titleEl.textContent = t ? t.label : activeOrderKey; subEl.textContent = 'Dine-in'; }
+
+  const itemsEl = document.getElementById('ticket-items');
+  const emptyEl = document.getElementById('ticket-empty');
+  if (!ticket || ticket.items.length === 0) { itemsEl.innerHTML = ''; emptyEl.style.display = 'flex'; }
+  else {
+    emptyEl.style.display = 'none';
+    itemsEl.innerHTML = ticket.items.map(item => `
+      <div class="flex gap-3 items-start py-3 border-b border-outline-variant/15">
+        <img src="${item.img || ''}" class="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-surface-container" onerror="this.style.display='none'"/>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm text-primary leading-tight">${item.name}</p>
+          ${item.options ? `<p class="text-xs text-on-surface-variant mt-0.5">${item.options}</p>` : ''}
+          <div class="flex items-center justify-between mt-2">
+            <div class="flex items-center gap-1.5 bg-surface-container rounded-full border border-outline-variant/40 p-0.5">
+              <button onclick="changeTicketQty('${item.key}',-1)" class="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white active:scale-90"><span class="material-symbols-outlined text-sm">remove</span></button>
+              <span class="w-5 text-center text-xs font-bold">${item.qty}</span>
+              <button onclick="changeTicketQty('${item.key}',1)" class="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white active:scale-90"><span class="material-symbols-outlined text-sm">add</span></button>
+            </div>
+            <span class="font-bold text-sm text-secondary">${fmt(item.unitPrice * item.qty)}</span>
+          </div>
+        </div>
+        <button onclick="removeTicketItem('${item.key}')" class="text-error hover:bg-error/10 rounded-full p-1 flex-shrink-0"><span class="material-symbols-outlined text-base">delete</span></button>
+      </div>
+    `).join('');
+  }
+  const totals = ticket ? calcTotals(ticket) : { subtotal:0, discountAmt:0, tax:0, total:0 };
+  document.getElementById('t-subtotal').textContent = fmt(totals.subtotal);
+  document.getElementById('t-tax').textContent = fmt(totals.tax);
+  document.getElementById('t-total').textContent = fmt(totals.total);
+  document.getElementById('t-discount-label').textContent = ticket && ticket.discountPct
+    ? Math.round(ticket.discountPct*100) + '% applied (' + fmt(totals.discountAmt) + ')'
+    : 'Add discount';
+}
+
+// ===================================================================
+// DISCOUNT MODAL
+// ===================================================================
+function openDiscountModal() { document.getElementById('modal-discount').classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function setDiscount(pct) {
+  const ticket = getActiveTicket();
+  if (ticket) ticket.discountPct = pct;
+  renderTicket();
+  closeModal('modal-discount');
+  showToast(pct > 0 ? Math.round(pct*100)+'% discount applied' : 'Discount removed', 'percent');
+}
+function setCustomDiscount() {
+  const val = parseFloat(document.getElementById('custom-discount-input').value);
+  if (isNaN(val) || val < 0 || val > 100) { showToast('Enter a valid %', 'error', true); return; }
+  setDiscount(val / 100);
+}
+
+// ===================================================================
+// PAYMENT MODAL + COMPLETION (writes transactions + deducts stock)
+// ===================================================================
+function openPaymentModal() {
+  const ticket = getActiveTicket();
+  if (!ticket || ticket.items.length === 0) { showToast('Add items before charging', 'error', true); return; }
+  const totals = calcTotals(ticket);
+  document.getElementById('pay-amount-due').textContent = fmt(totals.total);
+  document.getElementById('cash-tendered-input').value = '';
+  document.getElementById('change-due').textContent = fmt(0);
+  payMethod = 'cash';
+  document.querySelectorAll('.pay-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.pay-btn')[0].classList.add('selected');
+  document.getElementById('cash-tender-section').style.display = 'block';
+  document.getElementById('gcash-section').style.display = 'none';
+  document.getElementById('modal-payment').classList.add('open');
+}
+function selectPayMethod(method, btn) {
+  payMethod = method;
+  document.querySelectorAll('.pay-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('cash-tender-section').style.display = method === 'cash' ? 'block' : 'none';
+  document.getElementById('gcash-section').style.display = method === 'gcash' ? 'block' : 'none';
+}
+function quickCash(amount) { document.getElementById('cash-tendered-input').value = amount; updateChange(); }
+function updateChange() {
+  const ticket = getActiveTicket();
+  if (!ticket) return;
+  const totals = calcTotals(ticket);
+  const tendered = parseFloat(document.getElementById('cash-tendered-input').value) || 0;
+  const change = tendered - totals.total;
+  const changeEl = document.getElementById('change-due');
+  changeEl.textContent = fmt(Math.max(0, change));
+  changeEl.className = change < 0 ? 'text-error' : 'text-success';
+}
+
+function generateReceiptNumber() {
+  const d = new Date();
+  const ymd = d.toISOString().slice(0,10).replace(/-/g,'');
+  const rand = Math.floor(Math.random()*9000+1000);
+  return `KG-${ymd}-${rand}`;
+}
+
+async function completePayment() {
+  const ticket = getActiveTicket();
+  if (!ticket || ticket.items.length === 0) return;
+  const totals = calcTotals(ticket);
+
+  let tendered = null, change = null;
+  if (payMethod === 'cash') {
+    tendered = parseFloat(document.getElementById('cash-tendered-input').value) || 0;
+    if (tendered < totals.total) { showToast('Insufficient cash tendered', 'error', true); return; }
+    change = tendered - totals.total;
+  }
+
+  const btn = document.getElementById('complete-payment-btn');
+  btn.disabled = true;
+  btn.querySelector('span:last-child').textContent = 'Processing…';
+
+  try {
+    const isTakeout = activeOrderKey.startsWith('takeout');
+    const tableLabel = isTakeout ? null : (TABLES.find(t=>t.id===activeOrderKey)?.label || activeOrderKey);
+
+    // 1. Insert transaction header
+    const { data: txn, error: txnErr } = await sb.from('transactions').insert({
+      receipt_number: generateReceiptNumber(),
+      cashier_id: currentUser.id,
+      order_type: isTakeout ? 'takeout' : 'dine_in',
+      table_label: tableLabel,
+      subtotal: round2(totals.subtotal),
+      discount_pct: ticket.discountPct * 100,
+      discount_amount: round2(totals.discountAmt),
+      tax_amount: round2(totals.tax),
+      total: round2(totals.total),
+      payment_method: payMethod,
+      amount_tendered: tendered !== null ? round2(tendered) : null,
+      change_given: change !== null ? round2(change) : null,
+      status: 'completed'
+    }).select().single();
+    if (txnErr) throw txnErr;
+
+    // 2. Insert line items
+    const lineItems = ticket.items.map(i => ({
+      transaction_id: txn.id,
+      product_id: i.id,
+      product_name: i.name,
+      unit_price: round2(i.unitPrice),
+      quantity: i.qty,
+      options_label: i.options || null,
+      line_total: round2(i.unitPrice * i.qty)
+    }));
+    const { error: liErr } = await sb.from('transaction_items').insert(lineItems);
+    if (liErr) throw liErr;
+
+    // 3. Deduct stock per item + log each deduction
+    for (const i of ticket.items) {
+      const current = inventoryCache[i.id]?.quantity_on_hand ?? 0;
+      const newQty = Math.max(0, current - i.qty);
+      const { error: invErr } = await sb.from('inventory').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('product_id', i.id);
+      if (invErr) throw invErr;
+      await sb.from('inventory_logs').insert({
+        product_id: i.id, change_qty: -i.qty, reason: 'sale', reference_id: txn.id, performed_by: currentUser.id
+      });
+      if (inventoryCache[i.id]) inventoryCache[i.id].quantity_on_hand = newQty;
+    }
+
+    // Receipt UI
+    const methodLabel = { cash:'Cash', gcash:'GCash' }[payMethod];
+    document.getElementById('receipt-summary').textContent = `Receipt ${txn.receipt_number} — ${fmt(totals.total)} paid via ${methodLabel}.`;
+    let detailHtml = ticket.items.map(i => `${i.qty}x ${i.name} — ${fmt(i.unitPrice*i.qty)}`).join('<br/>');
+    detailHtml += `<br/><br/>Subtotal: ${fmt(totals.subtotal)}<br/>Discount: -${fmt(totals.discountAmt)}<br/>Tax: ${fmt(totals.tax)}<br/><strong>Total: ${fmt(totals.total)}</strong>`;
+    if (payMethod === 'cash') detailHtml += `<br/>Tendered: ${fmt(tendered)}<br/>Change: ${fmt(change)}`;
+    document.getElementById('receipt-detail').innerHTML = detailHtml;
+
+    closeModal('modal-payment');
+    document.getElementById('modal-receipt').classList.add('open');
+    delete tableOrders[activeOrderKey];
+    renderProductGrid(); // reflect updated stock immediately
+  } catch (e) {
+    console.error(e);
+    showToast('Payment failed to save — try again', 'error', true);
+  } finally {
+    btn.disabled = false;
+    btn.querySelector('span:last-child').textContent = 'Complete Payment';
+  }
+}
+function round2(n) { return Math.round(n * 100) / 100; }
+
+function closeReceiptAndReset() {
+  closeModal('modal-receipt');
+  activeOrderKey = null;
+  showView('tables');
+}
+
+// ===================================================================
+// INVENTORY VIEW
+// ===================================================================
+async function loadInventory() {
+  document.getElementById('inventory-loading').style.display = 'flex';
+  document.getElementById('inventory-table').style.display = 'none';
+  try {
+    const { data: products, error: pErr } = await sb.from('products').select('*').eq('is_active', true).order('category').order('name');
+    if (pErr) throw pErr;
+    const { data: inv, error: iErr } = await sb.from('inventory').select('*');
+    if (iErr) throw iErr;
+    const invMap = {};
+    inv.forEach(row => invMap[row.product_id] = row);
+
+    let lowStockCount = 0;
+    const tbody = document.getElementById('inventory-tbody');
+    tbody.innerHTML = products.map(p => {
+      const row = invMap[p.id] || { quantity_on_hand: 0, low_stock_threshold: 10 };
+      const isLow = row.quantity_on_hand <= row.low_stock_threshold && row.quantity_on_hand > 0;
+      const isOut = row.quantity_on_hand <= 0;
+      if (isLow || isOut) lowStockCount++;
+      let statusHtml = `<span class="stock-pill bg-success/10 text-success">In Stock</span>`;
+      if (isOut) statusHtml = `<span class="stock-pill bg-error/10 text-error">Out of Stock</span>`;
+      else if (isLow) statusHtml = `<span class="stock-pill bg-warning/10 text-warning">Low Stock</span>`;
+      return `
+        <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low/50">
+          <td class="py-3 pr-4 font-medium text-primary">${p.name}</td>
+          <td class="py-3 pr-4 text-on-surface-variant capitalize">${p.category}</td>
+          <td class="py-3 pr-4 font-bold">${row.quantity_on_hand}</td>
+          <td class="py-3 pr-4">${statusHtml}</td>
+          <td class="py-3 pr-4 admin-only ${currentUser.role!=='admin'?'role-hidden':''}">
+            <button onclick="openRestockModal('${p.id}','${p.name.replace(/'/g,"\\'")}')" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">add_box</span> Restock
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    document.getElementById('low-stock-badge').style.display = lowStockCount > 0 ? 'flex' : 'none';
+    document.getElementById('low-stock-count').textContent = lowStockCount;
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load inventory', 'error', true);
+  } finally {
+    document.getElementById('inventory-loading').style.display = 'none';
+    document.getElementById('inventory-table').style.display = 'table';
+    applyRoleVisibility();
+  }
+}
+
+function openRestockModal(productId, productName) {
+  document.getElementById('restock-product-id').value = productId;
+  document.getElementById('restock-product-name').textContent = productName;
+  document.getElementById('restock-qty').value = '';
+  document.getElementById('modal-restock').classList.add('open');
+}
+async function confirmRestock() {
+  const productId = document.getElementById('restock-product-id').value;
+  const qty = parseInt(document.getElementById('restock-qty').value);
+  if (!qty || qty <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
+  try {
+    const { data: row, error: fetchErr } = await sb.from('inventory').select('*').eq('product_id', productId).single();
+    if (fetchErr) throw fetchErr;
+    const newQty = row.quantity_on_hand + qty;
+    const { error: updErr } = await sb.from('inventory').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('product_id', productId);
+    if (updErr) throw updErr;
+    await sb.from('inventory_logs').insert({ product_id: productId, change_qty: qty, reason: 'restock', performed_by: currentUser.id });
+    showToast(`Added ${qty} units`, 'check');
+    closeModal('modal-restock');
+    loadInventory();
+  } catch (e) {
+    console.error(e);
+    showToast('Restock failed', 'error', true);
+  }
+}
+
+// ===================================================================
+// PRODUCT MANAGEMENT VIEW (admin only)
+// ===================================================================
+async function loadProductsManagement() {
+  document.getElementById('products-loading').style.display = 'flex';
+  document.getElementById('products-table').style.display = 'none';
+  try {
+    const { data: products, error } = await sb.from('products').select('*').order('category').order('name');
+    if (error) throw error;
+    const tbody = document.getElementById('products-tbody');
+    tbody.innerHTML = products.map(p => `
+      <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low/50">
+        <td class="py-2 pr-4"><img src="${p.image_url||''}" class="w-10 h-10 rounded-lg object-cover bg-surface-container" onerror="this.style.opacity=0.2"/></td>
+        <td class="py-2 pr-4 font-medium text-primary">${p.name}</td>
+        <td class="py-2 pr-4 capitalize text-on-surface-variant">${p.category}</td>
+        <td class="py-2 pr-4">${fmt(p.base_price)}</td>
+        <td class="py-2 pr-4">${p.has_options ? 'Yes' : 'No'}</td>
+        <td class="py-2 pr-4">${p.is_active ? `<span class="stock-pill bg-success/10 text-success">Active</span>` : `<span class="stock-pill bg-outline-variant/20 text-on-surface-variant">Hidden</span>`}</td>
+        <td class="py-2 pr-4 text-right">
+          <button onclick='openProductFormModal(${JSON.stringify(p).replace(/'/g,"&apos;")})' class="text-secondary font-semibold text-xs hover:underline mr-3">Edit</button>
+          <button onclick="openDeleteConfirm('${p.id}','${p.name.replace(/'/g,"\\'")}')" class="text-error font-semibold text-xs hover:underline">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load products', 'error', true);
+  } finally {
+    document.getElementById('products-loading').style.display = 'none';
+    document.getElementById('products-table').style.display = 'table';
+  }
+}
+
+function openProductFormModal(product) {
+  document.getElementById('product-form-title').textContent = product ? 'Edit Product' : 'New Product';
+  document.getElementById('pf-id').value = product ? product.id : '';
+  document.getElementById('pf-name').value = product ? product.name : '';
+  document.getElementById('pf-category').value = product ? product.category : 'coffee';
+  document.getElementById('pf-price').value = product ? product.base_price : '';
+  document.getElementById('pf-image').value = product ? (product.image_url || '') : '';
+  document.getElementById('pf-has-options').checked = product ? product.has_options : false;
+  document.getElementById('pf-is-active').checked = product ? product.is_active : true;
+  document.getElementById('pf-stock').value = 0;
+  document.getElementById('pf-stock').parentElement.style.display = product ? 'none' : 'block';
+  document.getElementById('modal-product-form').classList.add('open');
+}
+
+async function saveProductForm() {
+  const id = document.getElementById('pf-id').value;
+  const name = document.getElementById('pf-name').value.trim();
+  const category = document.getElementById('pf-category').value;
+  const price = parseFloat(document.getElementById('pf-price').value);
+  const image_url = document.getElementById('pf-image').value.trim();
+  const has_options = document.getElementById('pf-has-options').checked;
+  const is_active = document.getElementById('pf-is-active').checked;
+  const startStock = parseInt(document.getElementById('pf-stock').value) || 0;
+
+  if (!name) { showToast('Name is required', 'error', true); return; }
+  if (isNaN(price) || price < 0) { showToast('Enter a valid price', 'error', true); return; }
+
+  try {
+    if (id) {
+      const { error } = await sb.from('products').update({
+        name, category, base_price: price, image_url, has_options, is_active, updated_at: new Date().toISOString()
+      }).eq('id', id);
+      if (error) throw error;
+      showToast('Product updated', 'check');
+    } else {
+      const { data: newProduct, error } = await sb.from('products').insert({
+        name, category, base_price: price, image_url, has_options, is_active
+      }).select().single();
+      if (error) throw error;
+      await sb.from('inventory').insert({ product_id: newProduct.id, quantity_on_hand: startStock, low_stock_threshold: 10 });
+      showToast('Product created', 'check');
+    }
+    closeModal('modal-product-form');
+    loadProductsManagement();
+  } catch (e) {
+    console.error(e);
+    showToast('Save failed', 'error', true);
+  }
+}
+
+function openDeleteConfirm(id, name) {
+  document.getElementById('delete-product-id').value = id;
+  document.getElementById('delete-product-name').textContent = name;
+  document.getElementById('modal-confirm-delete').classList.add('open');
+}
+async function confirmDeleteProduct() {
+  const id = document.getElementById('delete-product-id').value;
+  try {
+    // Soft delete: keep historical sales records intact, just hide from POS
+    const { error } = await sb.from('products').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    showToast('Product removed from catalog', 'check');
+    closeModal('modal-confirm-delete');
+    loadProductsManagement();
+  } catch (e) {
+    console.error(e);
+    showToast('Delete failed', 'error', true);
+  }
+}
+
+// ===================================================================
+// REPORTS VIEW (admin only)
+// ===================================================================
+function setReportRange(range) {
+  currentReportRange = range;
+  document.querySelectorAll('.report-range-btn').forEach(b => {
+    b.classList.toggle('bg-primary', b.dataset.range === range);
+    b.classList.toggle('text-white', b.dataset.range === range);
+  });
+  loadReports();
+}
+
+function rangeStartDate(range) {
+  const d = new Date();
+  if (range === 'today') { d.setHours(0,0,0,0); return d; }
+  if (range === 'week') { d.setDate(d.getDate()-7); return d; }
+  return null; // all time
+}
+
+async function loadReports() {
+  document.getElementById('reports-loading').style.display = 'flex';
+  document.getElementById('reports-content').style.display = 'none';
+  document.querySelectorAll('.report-range-btn').forEach(b => {
+    b.classList.toggle('bg-primary', b.dataset.range === currentReportRange);
+    b.classList.toggle('text-white', b.dataset.range === currentReportRange);
+  });
+
+  try {
+    let query = sb.from('transactions').select('*').eq('status', 'completed').order('created_at', { ascending: false });
+    const start = rangeStartDate(currentReportRange);
+    if (start) query = query.gte('created_at', start.toISOString());
+    const { data: txns, error: tErr } = await query;
+    if (tErr) throw tErr;
+
+    const txnIds = txns.map(t => t.id);
+    let items = [];
+    if (txnIds.length > 0) {
+      const { data: itemRows, error: iErr } = await sb.from('transaction_items').select('*').in('transaction_id', txnIds);
+      if (iErr) throw iErr;
+      items = itemRows;
+    }
+
+    const gross = txns.reduce((s,t) => s + Number(t.total), 0);
+    const orderCount = txns.length;
+    const avgTicket = orderCount ? gross / orderCount : 0;
+    const itemCount = items.reduce((s,i) => s + i.quantity, 0);
+
+    document.getElementById('rep-gross').textContent = fmt(gross);
+    document.getElementById('rep-orders').textContent = orderCount;
+    document.getElementById('rep-avg').textContent = fmt(avgTicket);
+    document.getElementById('rep-items').textContent = itemCount;
+
+    // Top items
+    const itemTotals = {};
+    items.forEach(i => { itemTotals[i.product_name] = (itemTotals[i.product_name] || 0) + i.quantity; });
+    const topItems = Object.entries(itemTotals).sort((a,b) => b[1]-a[1]).slice(0,6);
+    document.getElementById('rep-top-items').innerHTML = topItems.length ? topItems.map(([name,count]) => `
+      <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium">${name}</span><span class="text-on-surface-variant font-semibold">${count} sold</span></div>
+    `).join('') : `<p class="text-sm text-on-surface-variant">No sales in this period.</p>`;
+
+    // Payment breakdown
+    const methodTotals = {};
+    txns.forEach(t => { methodTotals[t.payment_method] = (methodTotals[t.payment_method] || 0) + Number(t.total); });
+    document.getElementById('rep-payment-breakdown').innerHTML = Object.keys(methodTotals).length ? Object.entries(methodTotals).map(([method,total]) => `
+      <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium capitalize">${method === 'gcash' ? 'GCash' : method}</span><span class="text-on-surface-variant font-semibold">${fmt(total)}</span></div>
+    `).join('') : `<p class="text-sm text-on-surface-variant">No sales in this period.</p>`;
+
+    // Transaction log
+    document.getElementById('rep-transaction-log').innerHTML = txns.length ? txns.map(t => {
+      const itemsForTxn = items.filter(i => i.transaction_id === t.id);
+      const lineCount = itemsForTxn.reduce((s,i)=>s+i.quantity,0);
+      return `
+        <tr class="border-b border-outline-variant/10">
+          <td class="py-2 pr-4 font-mono text-xs">${t.receipt_number}</td>
+          <td class="py-2 pr-4 text-on-surface-variant">${new Date(t.created_at).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
+          <td class="py-2 pr-4 capitalize">${t.order_type === 'dine_in' ? (t.table_label || 'Dine-in') : 'Takeout'}</td>
+          <td class="py-2 pr-4">${lineCount}</td>
+          <td class="py-2 pr-4 capitalize">${t.payment_method === 'gcash' ? 'GCash' : t.payment_method}</td>
+          <td class="py-2 pr-4 text-right font-semibold">${fmt(t.total)}</td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="6" class="py-6 text-center text-sm text-on-surface-variant">No transactions in this period.</td></tr>`;
+
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load reports', 'error', true);
+  } finally {
+    document.getElementById('reports-loading').style.display = 'none';
+    document.getElementById('reports-content').style.display = 'block';
+  }
+}
+
+// ===================================================================
+// INIT
+// ===================================================================
+document.getElementById('login-username').focus();
+</script>
+</body>
+</html>
