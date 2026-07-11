@@ -99,8 +99,6 @@
     <button onclick="attemptLogin()" id="login-btn" class="w-full py-3.5 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all">
       <span id="login-btn-label">Sign In</span>
     </button>
-
-    <p class="text-center text-xs text-on-surface-variant mt-6">Demo: <strong>admin</strong>/1234 or <strong>cashier</strong>/0000</p>
   </div>
 </div>
 
@@ -128,6 +126,9 @@
       </button>
       <button onclick="showView('reports')" id="nav-reports" class="nav-top admin-only flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
         <span class="material-symbols-outlined text-lg">bar_chart</span> Reports
+      </button>
+      <button onclick="showView('staff')" id="nav-staff" class="nav-top admin-only flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+        <span class="material-symbols-outlined text-lg">badge</span> Staff
       </button>
       <div class="h-8 w-px bg-white/20"></div>
       <div class="flex items-center gap-2 text-sm">
@@ -262,6 +263,34 @@
           </tr>
         </thead>
         <tbody id="products-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===================== VIEW: STAFF (admin only) ===================== -->
+  <div class="view flex-col flex-1 overflow-hidden" id="view-staff">
+    <div class="px-8 py-5 flex-shrink-0 border-b border-outline-variant/30 flex justify-between items-center">
+      <div>
+        <h1 class="font-bold text-2xl text-primary">Staff Accounts</h1>
+        <p class="text-sm text-on-surface-variant">Create and manage cashier / admin logins</p>
+      </div>
+      <button onclick="openStaffFormModal()" class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+        <span class="material-symbols-outlined text-lg">person_add</span> Add Staff
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+      <div id="staff-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+      <table class="w-full text-left" id="staff-table" style="display:none">
+        <thead>
+          <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+            <th class="py-3 pr-4">Username</th>
+            <th class="py-3 pr-4">Full Name</th>
+            <th class="py-3 pr-4">Role</th>
+            <th class="py-3 pr-4">Status</th>
+            <th class="py-3 pr-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="staff-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -508,6 +537,41 @@
   </div>
 </div>
 
+<!-- ===== MODAL: STAFF FORM (add) ===== -->
+<div class="modal-overlay" id="modal-staff-form">
+  <div class="bg-surface-container-lowest rounded-2xl w-[440px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">New Staff Account</h3>
+      <button onclick="closeModal('modal-staff-form')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Username</label>
+        <input id="sf-username" type="text" autocomplete="off" placeholder="e.g. maria" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Full Name</label>
+        <input id="sf-fullname" type="text" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">PIN (min 6 characters)</label>
+        <input id="sf-pin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="••••••" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none tracking-widest"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Role</label>
+        <select id="sf-role" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none">
+          <option value="cashier">Cashier</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <p id="staff-form-error" class="text-error text-xs font-semibold h-4"></p>
+    </div>
+    <div class="p-6 border-t border-outline-variant/20">
+      <button onclick="saveStaffForm()" id="staff-save-btn" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Create Account</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL: RESTOCK ===== -->
 <div class="modal-overlay" id="modal-restock">
   <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
@@ -540,8 +604,8 @@
 // ===================================================================
 // SUPABASE CLIENT
 // ===================================================================
-const SUPABASE_URL = 'https://twadsnxsmhpgegmsfqrp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3YWRzbnhzbWhwZ2VnbXNmcXJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NDM2MTQsImV4cCI6MjA5NzMxOTYxNH0.lhCObIfo4IFeDT5K8hAq_9_EqOAq5G53vNhux2fVtcw';
+const SUPABASE_URL = 'https://vgprkfxmeioxevtocenp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZncHJrZnhtZWlveGV2dG9jZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzM3NjMsImV4cCI6MjA4NzY0OTc2M30.KoPJ4JXgPtZ13OHAwYVukfyWQykWJ2Gzr3CAWIBuSkA';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const TAX_RATE = 0.12;
@@ -569,10 +633,8 @@ const TABLES = Array.from({length: 10}, (_, i) => ({ id: 'T' + (i+1), label: 'Ta
 // ===================================================================
 let currentUser = null; // { id, username, full_name, role }
 
-async function hashPin(pin) {
-  const enc = new TextEncoder().encode(pin);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+function usernameToEmail(username) {
+  return `${username.trim().toLowerCase()}@kinglaine.pos`;
 }
 
 async function attemptLogin() {
@@ -584,14 +646,22 @@ async function attemptLogin() {
 
   setLoginLoading(true);
   try {
-    const { data, error } = await sb.from('users').select('*').eq('username', username).eq('is_active', true).maybeSingle();
-    if (error) throw error;
-    if (!data) { errEl.textContent = 'Invalid username or PIN.'; setLoginLoading(false); return; }
+    const { data: authData, error: authError } = await sb.auth.signInWithPassword({
+      email: usernameToEmail(username),
+      password: pin
+    });
+    if (authError) { errEl.textContent = 'Invalid username or PIN.'; setLoginLoading(false); return; }
 
-    const hashed = await hashPin(pin);
-    if (hashed !== data.pin_hash) { errEl.textContent = 'Invalid username or PIN.'; setLoginLoading(false); return; }
+    const { data: profile, error: profileError } = await sb.from('users')
+      .select('*').eq('id', authData.user.id).eq('is_active', true).maybeSingle();
+    if (profileError || !profile) {
+      errEl.textContent = 'Account not found or inactive.';
+      await sb.auth.signOut();
+      setLoginLoading(false);
+      return;
+    }
 
-    currentUser = { id: data.id, username: data.username, full_name: data.full_name, role: data.role };
+    currentUser = { id: profile.id, username: profile.username, full_name: profile.full_name, role: profile.role };
     enterApp();
   } catch (e) {
     console.error(e);
@@ -622,7 +692,8 @@ function applyRoleVisibility() {
   });
 }
 
-function logout() {
+async function logout() {
+  await sb.auth.signOut();
   currentUser = null;
   activeOrderKey = null;
   document.getElementById('login-username').value = '';
@@ -665,7 +736,7 @@ function showView(view) {
   const navEl = document.getElementById('nav-' + view);
   if (navEl) navEl.classList.add('bg-white/10');
 
-  if ((view === 'products' || view === 'reports') && currentUser.role !== 'admin') {
+  if ((view === 'products' || view === 'reports' || view === 'staff') && currentUser.role !== 'admin') {
     showToast('Admin access required', 'lock');
     showView('tables');
     return;
@@ -676,6 +747,7 @@ function showView(view) {
   if (view === 'inventory') loadInventory();
   if (view === 'products') loadProductsManagement();
   if (view === 'reports') loadReports();
+  if (view === 'staff') loadStaffManagement();
 }
 
 function tickClock() {
@@ -1318,6 +1390,94 @@ async function confirmDeleteProduct() {
 }
 
 // ===================================================================
+// STAFF MANAGEMENT (admin only)
+// ===================================================================
+async function loadStaffManagement() {
+  document.getElementById('staff-loading').style.display = 'flex';
+  document.getElementById('staff-table').style.display = 'none';
+  try {
+    const { data: staff, error } = await sb.from('users').select('*').order('username');
+    if (error) throw error;
+
+    document.getElementById('staff-tbody').innerHTML = staff.map(u => `
+      <tr class="border-b border-outline-variant/10">
+        <td class="py-3 pr-4 font-medium">${u.username}</td>
+        <td class="py-3 pr-4">${u.full_name}</td>
+        <td class="py-3 pr-4 capitalize">${u.role}</td>
+        <td class="py-3 pr-4">
+          <span class="stock-pill ${u.is_active ? 'bg-success/15 text-success' : 'bg-error/15 text-error'}">${u.is_active ? 'Active' : 'Disabled'}</span>
+        </td>
+        <td class="py-3 pr-4 text-right">
+          <button onclick="toggleStaffActive('${u.id}', ${u.is_active})" class="text-sm font-semibold text-secondary hover:underline">
+            ${u.is_active ? 'Disable' : 'Enable'}
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load staff', 'error', true);
+  } finally {
+    document.getElementById('staff-loading').style.display = 'none';
+    document.getElementById('staff-table').style.display = 'table';
+  }
+}
+
+function openStaffFormModal() {
+  document.getElementById('sf-username').value = '';
+  document.getElementById('sf-fullname').value = '';
+  document.getElementById('sf-pin').value = '';
+  document.getElementById('sf-role').value = 'cashier';
+  document.getElementById('staff-form-error').textContent = '';
+  document.getElementById('modal-staff-form').classList.add('open');
+}
+
+async function saveStaffForm() {
+  const username = document.getElementById('sf-username').value.trim().toLowerCase();
+  const fullName = document.getElementById('sf-fullname').value.trim();
+  const pin = document.getElementById('sf-pin').value.trim();
+  const role = document.getElementById('sf-role').value;
+  const errEl = document.getElementById('staff-form-error');
+  errEl.textContent = '';
+
+  if (!username || !fullName) { errEl.textContent = 'Username and full name are required.'; return; }
+  if (pin.length < 6) { errEl.textContent = 'PIN must be at least 6 characters.'; return; }
+
+  const btn = document.getElementById('staff-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try {
+    const { error } = await sb.auth.signUp({
+      email: usernameToEmail(username),
+      password: pin,
+      options: { data: { username, full_name: fullName, role } }
+    });
+    if (error) { errEl.textContent = error.message; return; }
+    showToast('Staff account created', 'check');
+    closeModal('modal-staff-form');
+    loadStaffManagement();
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = 'Could not reach the server.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Account';
+  }
+}
+
+async function toggleStaffActive(id, currentlyActive) {
+  try {
+    const { error } = await sb.from('users').update({ is_active: !currentlyActive }).eq('id', id);
+    if (error) throw error;
+    showToast(currentlyActive ? 'Account disabled' : 'Account enabled', 'check');
+    loadStaffManagement();
+  } catch (e) {
+    console.error(e);
+    showToast('Update failed', 'error', true);
+  }
+}
+
+// ===================================================================
 // REPORTS VIEW (admin only)
 // ===================================================================
 function setReportRange(range) {
@@ -1412,7 +1572,18 @@ async function loadReports() {
 // ===================================================================
 // INIT
 // ===================================================================
-document.getElementById('login-username').focus();
+(async function restoreSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    const { data: profile } = await sb.from('users').select('*').eq('id', session.user.id).eq('is_active', true).maybeSingle();
+    if (profile) {
+      currentUser = { id: profile.id, username: profile.username, full_name: profile.full_name, role: profile.role };
+      enterApp();
+      return;
+    }
+  }
+  document.getElementById('login-username').focus();
+})();
 </script>
 </body>
 </html>
