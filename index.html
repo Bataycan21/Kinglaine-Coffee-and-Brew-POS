@@ -150,7 +150,12 @@
       <div class="flex items-center gap-4 text-sm">
         <div class="flex items-center gap-2"><span class="badge-dot bg-outline-variant"></span> Open</div>
         <div class="flex items-center gap-2"><span class="badge-dot bg-secondary"></span> Occupied</div>
-        <button onclick="startTakeoutOrder()" class="ml-4 flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+        <div class="flex items-center gap-2"><span class="badge-dot bg-error"></span> Maintenance</div>
+        <div class="flex items-center gap-2"><span class="badge-dot bg-blue-500"></span> Reserved</div>
+        <button onclick="openManageTablesModal()" class="admin-only ml-2 flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">tune</span> Manage Tables
+        </button>
+        <button onclick="startTakeoutOrder()" class="ml-2 flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">shopping_bag</span> New Takeout / Counter Order
         </button>
       </div>
@@ -209,31 +214,58 @@
     <div class="px-8 py-5 flex-shrink-0 border-b border-outline-variant/30 flex justify-between items-center">
       <div>
         <h1 class="font-bold text-2xl text-primary">Inventory</h1>
-        <p class="text-sm text-on-surface-variant">Stock on hand across all products</p>
+        <p class="text-sm text-on-surface-variant">Stock on hand across menu items and raw materials</p>
       </div>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2 text-sm bg-error-container text-on-error-container px-3 py-1.5 rounded-full" id="low-stock-badge" style="display:none">
           <span class="material-symbols-outlined text-base">warning</span> <span id="low-stock-count">0</span> low stock
         </div>
-        <button onclick="loadInventory()" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
+        <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95" style="display:none">
+          <span class="material-symbols-outlined text-lg">add</span> Add Supply
+        </button>
+        <button onclick="refreshInventoryTab()" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
           <span class="material-symbols-outlined text-sm">refresh</span> Refresh
         </button>
       </div>
     </div>
+    <div class="px-8 pt-5 flex-shrink-0">
+      <div class="flex items-center gap-2 bg-surface-container-low rounded-xl p-1 w-fit" id="inventory-tab-bar">
+        <button onclick="switchInventoryTab('products')" class="inventory-tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="products">Menu Items</button>
+        <button onclick="switchInventoryTab('supplies')" class="inventory-tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="supplies">Supplies</button>
+      </div>
+    </div>
     <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
-      <div id="inventory-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
-      <table class="w-full text-left" id="inventory-table" style="display:none">
-        <thead>
-          <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
-            <th class="py-3 pr-4">Product</th>
-            <th class="py-3 pr-4">Category</th>
-            <th class="py-3 pr-4">On Hand</th>
-            <th class="py-3 pr-4">Status</th>
-            <th class="py-3 pr-4 admin-only">Restock</th>
-          </tr>
-        </thead>
-        <tbody id="inventory-tbody"></tbody>
-      </table>
+      <div id="inventory-tab-products">
+        <div id="inventory-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+        <table class="w-full text-left" id="inventory-table" style="display:none">
+          <thead>
+            <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+              <th class="py-3 pr-4">Product</th>
+              <th class="py-3 pr-4">Category</th>
+              <th class="py-3 pr-4">On Hand</th>
+              <th class="py-3 pr-4">Status</th>
+              <th class="py-3 pr-4 admin-only">Restock</th>
+            </tr>
+          </thead>
+          <tbody id="inventory-tbody"></tbody>
+        </table>
+      </div>
+      <div id="inventory-tab-supplies" style="display:none">
+        <div id="supplies-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+        <table class="w-full text-left" id="supplies-table" style="display:none">
+          <thead>
+            <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+              <th class="py-3 pr-4">Supply</th>
+              <th class="py-3 pr-4">Unit</th>
+              <th class="py-3 pr-4">On Hand</th>
+              <th class="py-3 pr-4">Status</th>
+              <th class="py-3 pr-4">Restock</th>
+              <th class="py-3 pr-4 admin-only text-right">Remove</th>
+            </tr>
+          </thead>
+          <tbody id="supplies-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -507,7 +539,7 @@
           <option value="coffee">Coffee</option>
           <option value="tea">Tea</option>
           <option value="bakery">Bakery</option>
-          <option value="merch">Merch</option>
+          <option value="frappe">Frappe</option>
         </select>
       </div>
       <div>
@@ -582,6 +614,81 @@
   </div>
 </div>
 
+<!-- ===== MODAL: MANAGE TABLES (admin only) ===== -->
+<div class="modal-overlay" id="modal-manage-tables">
+  <div class="bg-surface-container-lowest rounded-2xl w-[480px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">Manage Tables</h3>
+      <button onclick="closeModal('modal-manage-tables')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 border-b border-outline-variant/20">
+      <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Add a new table</label>
+      <div class="flex gap-2">
+        <input id="new-table-label" type="text" placeholder="e.g. Table 11 or Patio A" class="flex-1 bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+        <button onclick="addNewTable()" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold">Add</button>
+      </div>
+    </div>
+    <div class="p-6 space-y-2" id="manage-tables-list"></div>
+    <div class="p-6 border-t border-outline-variant/20">
+      <button onclick="saveTableStatusChanges()" id="save-tables-btn" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: SUPPLY FORM (add) ===== -->
+<div class="modal-overlay" id="modal-supply-form">
+  <div class="bg-surface-container-lowest rounded-2xl w-[400px] shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">New Supply</h3>
+      <button onclick="closeModal('modal-supply-form')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Name</label>
+        <input id="sup-name" type="text" placeholder="e.g. Coffee Beans, Caramel Syrup" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Unit</label>
+        <select id="sup-unit" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none">
+          <option value="kg">Kilograms (kg)</option>
+          <option value="g">Grams (g)</option>
+          <option value="l">Liters (l)</option>
+          <option value="ml">Milliliters (ml)</option>
+          <option value="pcs">Pieces (pcs)</option>
+          <option value="bottle">Bottles</option>
+          <option value="pack">Packs</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Starting Quantity</label>
+        <input id="sup-qty" type="number" min="0" step="0.01" value="0" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Low Stock Threshold</label>
+        <input id="sup-threshold" type="number" min="0" step="0.01" value="5" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <p id="supply-form-error" class="text-error text-xs font-semibold h-4"></p>
+    </div>
+    <div class="p-6 border-t border-outline-variant/20">
+      <button onclick="saveSupplyForm()" id="save-supply-btn" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Add Supply</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: RESTOCK SUPPLY ===== -->
+<div class="modal-overlay" id="modal-restock-supply">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-lg text-primary">Restock <span id="restock-supply-name"></span></h3>
+      <button onclick="closeModal('modal-restock-supply')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <input type="hidden" id="restock-supply-id"/>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Quantity to add (<span id="restock-supply-unit"></span>)</label>
+    <input id="restock-supply-qty" type="number" min="0.01" step="0.01" placeholder="e.g. 10" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-4"/>
+    <button onclick="confirmRestockSupply()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Add Stock</button>
+  </div>
+</div>
+
 <!-- ===== MODAL: RESTOCK ===== -->
 <div class="modal-overlay" id="modal-restock">
   <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
@@ -634,9 +741,15 @@ const CATEGORIES = [
   { id:'coffee', label:'Coffee', icon:'coffee' },
   { id:'tea', label:'Tea', icon:'local_drink' },
   { id:'bakery', label:'Bakery', icon:'bakery_dining' },
-  { id:'merch', label:'Merch', icon:'shopping_bag' }
+  { id:'frappe', label:'Frappe', icon:'icecream' }
 ];
-const TABLES = Array.from({length: 10}, (_, i) => ({ id: 'T' + (i+1), label: 'Table ' + (i+1) }));
+let TABLES = []; // populated from public.restaurant_tables — { id, label, status, is_deleted }
+
+async function loadTables() {
+  const { data, error } = await sb.from('restaurant_tables').select('*').order('sort_order').order('created_at');
+  if (error) { console.error(error); showToast('Failed to load tables', 'error', true); return; }
+  TABLES = data;
+}
 
 // ===================================================================
 // AUTH STATE
@@ -728,7 +841,9 @@ let customSize = 'medium';
 let customMilk = 'Whole Milk';
 let payMethod = 'cash';
 let currentReportRange = 'today';
+let currentInventoryTab = 'products';
 let pendingProductImageFile = null;
+let pendingTableStatusChanges = {}; // { tableId: newStatus }
 
 function newTicket() { return { items: [], discountPct: 0 }; }
 function getActiveTicket() {
@@ -755,7 +870,7 @@ function showView(view) {
 
   if (view === 'tables') renderTables();
   if (view === 'order') { renderCategoryBar(); loadProductsAndRenderGrid(); renderTicket(); }
-  if (view === 'inventory') loadInventory();
+  if (view === 'inventory') showInventoryView();
   if (view === 'products') loadProductsManagement();
   if (view === 'reports') loadReports();
   if (view === 'staff') loadStaffManagement();
@@ -811,9 +926,28 @@ async function loadProductsAndRenderGrid() {
 // ===================================================================
 // TABLES VIEW
 // ===================================================================
-function renderTables() {
+async function renderTables() {
   const grid = document.getElementById('tables-grid');
-  grid.innerHTML = TABLES.map(t => {
+  await loadTables();
+  const visibleTables = TABLES.filter(t => !t.is_deleted);
+  grid.innerHTML = visibleTables.map(t => {
+    if (t.status !== 'available') {
+      const isReserved = t.status === 'reserved';
+      const statusLabel = isReserved ? 'Reserved' : 'Under Maintenance';
+      const borderCls = isReserved ? 'border-blue-300' : 'border-error/40';
+      const bgCls = isReserved ? 'bg-blue-50' : 'bg-error/5';
+      const dotCls = isReserved ? 'bg-blue-500' : 'bg-error';
+      const textCls = isReserved ? 'text-blue-600' : 'text-error';
+      return `
+        <div class="table-card flex flex-col items-start gap-2 p-5 rounded-2xl border-2 ${borderCls} ${bgCls} text-left opacity-70 cursor-not-allowed">
+          <div class="flex justify-between w-full items-center">
+            <span class="font-bold text-lg text-primary">${t.label}</span>
+            <span class="badge-dot ${dotCls}"></span>
+          </div>
+          <p class="text-sm ${textCls} font-semibold">${statusLabel}</p>
+        </div>
+      `;
+    }
     const ticket = tableOrders[t.id];
     const occupied = ticket && ticket.items.length > 0;
     const count = occupied ? ticket.items.reduce((s,i)=>s+i.qty,0) : 0;
@@ -833,9 +967,145 @@ function renderTables() {
 }
 
 function selectTable(tableId) {
+  const table = TABLES.find(t => t.id === tableId);
+  if (!table || table.status !== 'available') { showToast('This table is unavailable', 'error', true); return; }
   activeOrderKey = tableId;
   if (!tableOrders[tableId]) tableOrders[tableId] = newTicket();
   showView('order');
+}
+
+// ===================================================================
+// MANAGE TABLES (admin only)
+// ===================================================================
+function openManageTablesModal() {
+  document.getElementById('new-table-label').value = '';
+  pendingTableStatusChanges = {};
+  renderManageTablesList();
+  document.getElementById('modal-manage-tables').classList.add('open');
+}
+
+function renderManageTablesList() {
+  const list = document.getElementById('manage-tables-list');
+  const active = TABLES.filter(t => !t.is_deleted);
+  const deleted = TABLES.filter(t => t.is_deleted);
+
+  if (TABLES.length === 0) { list.innerHTML = `<p class="text-sm text-on-surface-variant">No tables yet.</p>`; return; }
+
+  let html = active.map(t => {
+    const currentStatus = pendingTableStatusChanges[t.id] || t.status;
+    return `
+    <div class="flex items-center justify-between p-3 bg-surface-container rounded-xl">
+      <span class="font-semibold text-sm text-primary">${t.label}</span>
+      <div class="flex items-center gap-3">
+        <select onchange="stageTableStatusChange('${t.id}', this.value)" class="text-xs font-semibold bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2 py-1.5 outline-none">
+          <option value="available" ${currentStatus==='available'?'selected':''}>Available</option>
+          <option value="maintenance" ${currentStatus==='maintenance'?'selected':''}>Under Maintenance</option>
+          <option value="reserved" ${currentStatus==='reserved'?'selected':''}>Reserved</option>
+        </select>
+        <button onclick="removeTable('${t.id}', '${t.label.replace(/'/g,"\\'")}')"
+                class="text-error hover:bg-error/10 rounded-full p-1.5" title="Remove table">
+          <span class="material-symbols-outlined text-base">delete</span>
+        </button>
+      </div>
+    </div>
+  `;
+  }).join('');
+
+  if (deleted.length > 0) {
+    html += `<p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mt-5 mb-2">Removed Tables</p>`;
+    html += deleted.map(t => `
+      <div class="flex items-center justify-between p-3 bg-surface-container/50 rounded-xl">
+        <span class="font-semibold text-sm text-on-surface-variant line-through">${t.label}</span>
+        <button onclick="restoreTable('${t.id}')" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">restart_alt</span> Restore
+        </button>
+      </div>
+    `).join('');
+  }
+
+  list.innerHTML = html;
+}
+
+function stageTableStatusChange(id, status) {
+  pendingTableStatusChanges[id] = status;
+}
+
+async function saveTableStatusChanges() {
+  const changes = Object.entries(pendingTableStatusChanges);
+  if (changes.length === 0) {
+    closeModal('modal-manage-tables');
+    return;
+  }
+  const btn = document.getElementById('save-tables-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await Promise.all(changes.map(([id, status]) =>
+      sb.from('restaurant_tables').update({ status }).eq('id', id).then(({ error }) => { if (error) throw error; })
+    ));
+    pendingTableStatusChanges = {};
+    await loadTables();
+    await renderTables();
+    closeModal('modal-manage-tables');
+    showToast('Table changes saved', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to save changes', 'error', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+  }
+}
+
+async function addNewTable() {
+  const label = document.getElementById('new-table-label').value.trim();
+  if (!label) { showToast('Enter a table name', 'error', true); return; }
+  try {
+    const maxSort = TABLES.reduce((m,t) => Math.max(m, t.sort_order || 0), 0);
+    const { error } = await sb.from('restaurant_tables').insert({ label, sort_order: maxSort + 1 });
+    if (error) throw error;
+    document.getElementById('new-table-label').value = '';
+    await loadTables();
+    renderManageTablesList();
+    renderTables();
+    showToast('Table added', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to add table', 'error', true);
+  }
+}
+
+async function removeTable(id, label) {
+  const ticket = tableOrders[id];
+  if (ticket && ticket.items.length > 0) { showToast('Cannot remove — table has an active order', 'error', true); return; }
+  if (!confirm(`Remove ${label}? You can restore it later from Manage Tables.`)) return;
+  try {
+    const { error } = await sb.from('restaurant_tables').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    delete tableOrders[id];
+    delete pendingTableStatusChanges[id];
+    await loadTables();
+    renderManageTablesList();
+    renderTables();
+    showToast('Table removed', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to remove table', 'error', true);
+  }
+}
+
+async function restoreTable(id) {
+  try {
+    const { error } = await sb.from('restaurant_tables').update({ is_deleted: false, deleted_at: null }).eq('id', id);
+    if (error) throw error;
+    await loadTables();
+    renderManageTablesList();
+    renderTables();
+    showToast('Table restored', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to restore table', 'error', true);
+  }
 }
 
 function startTakeoutOrder() {
@@ -1223,6 +1493,163 @@ function closeReceiptAndReset() {
 // ===================================================================
 // INVENTORY VIEW
 // ===================================================================
+// ===================================================================
+// INVENTORY TABS (Menu Items vs Supplies)
+// ===================================================================
+function showInventoryView() {
+  switchInventoryTab(currentInventoryTab);
+}
+
+function switchInventoryTab(tab) {
+  currentInventoryTab = tab;
+  document.querySelectorAll('.inventory-tab-btn').forEach(b => {
+    b.classList.toggle('bg-primary', b.dataset.tab === tab);
+    b.classList.toggle('text-white', b.dataset.tab === tab);
+  });
+  document.getElementById('inventory-tab-products').style.display = tab === 'products' ? 'block' : 'none';
+  document.getElementById('inventory-tab-supplies').style.display = tab === 'supplies' ? 'block' : 'none';
+  document.getElementById('add-supply-btn').style.display = (tab === 'supplies' && currentUser.role === 'admin') ? 'flex' : 'none';
+  document.getElementById('low-stock-badge').style.display = 'none';
+
+  if (tab === 'products') loadInventory();
+  if (tab === 'supplies') loadSupplies();
+}
+
+function refreshInventoryTab() {
+  if (currentInventoryTab === 'products') loadInventory();
+  else loadSupplies();
+}
+
+async function loadSupplies() {
+  document.getElementById('supplies-loading').style.display = 'flex';
+  document.getElementById('supplies-table').style.display = 'none';
+  try {
+    const { data: supplies, error } = await sb.from('supplies').select('*').order('name');
+    if (error) throw error;
+
+    let lowStockCount = 0;
+    document.getElementById('supplies-tbody').innerHTML = supplies.map(s => {
+      const isLow = s.quantity_on_hand <= s.low_stock_threshold && s.quantity_on_hand > 0;
+      const isOut = s.quantity_on_hand <= 0;
+      if (isLow || isOut) lowStockCount++;
+      let statusHtml = `<span class="stock-pill bg-success/10 text-success">In Stock</span>`;
+      if (isOut) statusHtml = `<span class="stock-pill bg-error/10 text-error">Out of Stock</span>`;
+      else if (isLow) statusHtml = `<span class="stock-pill bg-warning/10 text-warning">Low Stock</span>`;
+      return `
+        <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low/50">
+          <td class="py-3 pr-4 font-medium text-primary">${s.name}</td>
+          <td class="py-3 pr-4 text-on-surface-variant uppercase text-xs">${s.unit}</td>
+          <td class="py-3 pr-4 font-bold">${s.quantity_on_hand}</td>
+          <td class="py-3 pr-4">${statusHtml}</td>
+          <td class="py-3 pr-4">
+            <button onclick="openRestockSupplyModal('${s.id}','${s.name.replace(/'/g,"\\'")}','${s.unit}')" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">add_box</span> Restock
+            </button>
+          </td>
+          <td class="py-3 pr-4 admin-only text-right ${currentUser.role!=='admin'?'role-hidden':''}">
+            <button onclick="removeSupply('${s.id}','${s.name.replace(/'/g,"\\'")}')" class="text-error hover:bg-error/10 rounded-full p-1.5">
+              <span class="material-symbols-outlined text-base">delete</span>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (currentInventoryTab === 'supplies') {
+      document.getElementById('low-stock-badge').style.display = lowStockCount > 0 ? 'flex' : 'none';
+      document.getElementById('low-stock-count').textContent = lowStockCount;
+    }
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load supplies', 'error', true);
+  } finally {
+    document.getElementById('supplies-loading').style.display = 'none';
+    document.getElementById('supplies-table').style.display = 'table';
+    applyRoleVisibility();
+  }
+}
+
+function openSupplyFormModal() {
+  document.getElementById('sup-name').value = '';
+  document.getElementById('sup-unit').value = 'kg';
+  document.getElementById('sup-qty').value = 0;
+  document.getElementById('sup-threshold').value = 5;
+  document.getElementById('supply-form-error').textContent = '';
+  document.getElementById('modal-supply-form').classList.add('open');
+}
+
+async function saveSupplyForm() {
+  const name = document.getElementById('sup-name').value.trim();
+  const unit = document.getElementById('sup-unit').value;
+  const qty = parseFloat(document.getElementById('sup-qty').value);
+  const threshold = parseFloat(document.getElementById('sup-threshold').value);
+  const errEl = document.getElementById('supply-form-error');
+  errEl.textContent = '';
+
+  if (!name) { errEl.textContent = 'Name is required.'; return; }
+  if (isNaN(qty) || qty < 0) { errEl.textContent = 'Enter a valid starting quantity.'; return; }
+
+  const btn = document.getElementById('save-supply-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const { error } = await sb.from('supplies').insert({
+      name, unit, quantity_on_hand: qty, low_stock_threshold: isNaN(threshold) ? 5 : threshold
+    });
+    if (error) throw error;
+    showToast('Supply added', 'check');
+    closeModal('modal-supply-form');
+    loadSupplies();
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = 'Failed to save supply.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Add Supply';
+  }
+}
+
+function openRestockSupplyModal(supplyId, supplyName, unit) {
+  document.getElementById('restock-supply-id').value = supplyId;
+  document.getElementById('restock-supply-name').textContent = supplyName;
+  document.getElementById('restock-supply-unit').textContent = unit;
+  document.getElementById('restock-supply-qty').value = '';
+  document.getElementById('modal-restock-supply').classList.add('open');
+}
+
+async function confirmRestockSupply() {
+  const supplyId = document.getElementById('restock-supply-id').value;
+  const qty = parseFloat(document.getElementById('restock-supply-qty').value);
+  if (!qty || qty <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
+  try {
+    const { data: row, error: fetchErr } = await sb.from('supplies').select('*').eq('id', supplyId).single();
+    if (fetchErr) throw fetchErr;
+    const newQty = row.quantity_on_hand + qty;
+    const { error: updErr } = await sb.from('supplies').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('id', supplyId);
+    if (updErr) throw updErr;
+    await sb.from('supply_logs').insert({ supply_id: supplyId, change_qty: qty, reason: 'restock', performed_by: currentUser.id });
+    showToast(`Added ${qty} ${row.unit}`, 'check');
+    closeModal('modal-restock-supply');
+    loadSupplies();
+  } catch (e) {
+    console.error(e);
+    showToast('Restock failed', 'error', true);
+  }
+}
+
+async function removeSupply(id, name) {
+  if (!confirm(`Remove ${name}? This cannot be undone.`)) return;
+  try {
+    const { error } = await sb.from('supplies').delete().eq('id', id);
+    if (error) throw error;
+    showToast('Supply removed', 'check');
+    loadSupplies();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to remove supply', 'error', true);
+  }
+}
+
 async function loadInventory() {
   document.getElementById('inventory-loading').style.display = 'flex';
   document.getElementById('inventory-table').style.display = 'none';
@@ -1259,7 +1686,7 @@ async function loadInventory() {
       `;
     }).join('');
 
-    document.getElementById('low-stock-badge').style.display = lowStockCount > 0 ? 'flex' : 'none';
+    document.getElementById('low-stock-badge').style.display = (currentInventoryTab === 'products' && lowStockCount > 0) ? 'flex' : 'none';
     document.getElementById('low-stock-count').textContent = lowStockCount;
   } catch (e) {
     console.error(e);
