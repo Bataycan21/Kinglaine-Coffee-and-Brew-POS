@@ -276,9 +276,14 @@
         <h1 class="font-bold text-2xl text-primary">Product Management</h1>
         <p class="text-sm text-on-surface-variant">Add, edit, or remove menu items</p>
       </div>
-      <button onclick="openProductFormModal(null)" class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
-        <span class="material-symbols-outlined text-lg">add</span> New Product
-      </button>
+      <div class="flex items-center gap-3">
+        <button onclick="openManageAddonsModal()" class="flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">tune</span> Manage Add-ons
+        </button>
+        <button onclick="openProductFormModal(null)" class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">add</span> New Product
+        </button>
+      </div>
     </div>
     <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
       <div id="products-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
@@ -410,10 +415,7 @@
         <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Size</p>
         <div class="grid grid-cols-3 gap-2" id="cust-size-options"></div>
       </div>
-      <div>
-        <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Milk</p>
-        <div class="flex flex-wrap gap-2" id="cust-milk-options"></div>
-      </div>
+      <div id="cust-option-groups" class="space-y-5"></div>
       <div>
         <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Add-ons</p>
         <div class="space-y-2" id="cust-addons"></div>
@@ -689,6 +691,60 @@
   </div>
 </div>
 
+<!-- ===== MODAL: RECIPE & OPTIONS (per product, admin only) ===== -->
+<div class="modal-overlay" id="modal-recipe">
+  <div class="bg-surface-container-lowest rounded-2xl w-[560px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">Recipe & Options — <span id="recipe-product-name"></span></h3>
+      <button onclick="closeModal('modal-recipe')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <input type="hidden" id="recipe-product-id"/>
+
+    <div class="p-6 border-b border-outline-variant/20">
+      <h4 class="font-bold text-sm text-primary mb-1">Base Ingredients</h4>
+      <p class="text-xs text-on-surface-variant mb-3">Always used per unit sold. Quantity is measured at Medium size — Small/Large scale automatically.</p>
+      <div id="recipe-items-list" class="space-y-2 mb-3"></div>
+      <div class="flex gap-2">
+        <select id="recipe-new-supply" class="flex-1 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"></select>
+        <input id="recipe-new-qty" type="number" min="0.01" step="0.01" placeholder="Qty" class="w-24 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
+        <button onclick="addRecipeItem()" class="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold">Add</button>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <h4 class="font-bold text-sm text-primary mb-1">Customer Options</h4>
+      <p class="text-xs text-on-surface-variant mb-3">e.g. "Milk Type" — link each choice to the exact supply it should deduct.</p>
+      <div id="option-groups-list" class="space-y-4 mb-4"></div>
+      <div class="flex gap-2">
+        <input id="new-group-name" placeholder="New option group, e.g. Milk Type" class="flex-1 bg-surface-container rounded-lg px-3 py-2 text-xs border border-outline-variant/30 outline-none"/>
+        <button onclick="addOptionGroup()" class="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold whitespace-nowrap">Add Group</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: MANAGE ADD-ONS (global, admin only) ===== -->
+<div class="modal-overlay" id="modal-manage-addons">
+  <div class="bg-surface-container-lowest rounded-2xl w-[480px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">Manage Add-ons</h3>
+      <button onclick="closeModal('modal-manage-addons')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 space-y-2" id="addons-list"></div>
+    <div class="p-6 border-t border-outline-variant/20 space-y-2">
+      <input id="new-addon-label" placeholder="Add-on name, e.g. Extra Espresso Shot" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      <div class="flex gap-2">
+        <input id="new-addon-price" type="number" min="0" step="0.01" placeholder="Price" class="w-24 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
+        <select id="new-addon-supply" class="flex-1 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none">
+          <option value="">No ingredient link</option>
+        </select>
+        <input id="new-addon-qty" type="number" min="0" step="0.01" placeholder="Qty used" class="w-24 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
+      </div>
+      <button onclick="addAddon()" class="w-full py-2.5 bg-primary text-white rounded-lg text-sm font-semibold">Add Add-on</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL: RESTOCK ===== -->
 <div class="modal-overlay" id="modal-restock">
   <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
@@ -732,11 +788,9 @@ const SIZE_OPTIONS = [
   { id:'medium', label:'M · 16oz', add:0 },
   { id:'large', label:'L · 20oz', add:0.75 }
 ];
-const MILK_OPTIONS = ['Whole Milk','Oat Milk','Almond Milk','Skim Milk'];
-const ADDON_OPTIONS = [
-  { id:'espresso', label:'Extra Espresso Shot', price:0.95 },
-  { id:'caramel', label:'Caramel Drizzle', price:0.60 }
-];
+// Note: sizes' price deltas mirror the `sizes` table in Supabase (used there for
+// scaling recipe quantities). Milk options and add-ons are now loaded live from
+// the database (option_groups/option_values and addons) — see openCustomizeModal().
 const CATEGORIES = [
   { id:'coffee', label:'Coffee', icon:'coffee' },
   { id:'tea', label:'Tea', icon:'local_drink' },
@@ -838,7 +892,9 @@ let currentCategory = 'coffee';
 let customizeProduct = null;
 let customQty = 1;
 let customSize = 'medium';
-let customMilk = 'Whole Milk';
+let customOptionGroups = []; // option groups (with values) for the product currently being customized
+let customSelectedValues = {}; // { groupId: optionValueId }
+let customAddonsCache = []; // all active global add-ons
 let payMethod = 'cash';
 let currentReportRange = 'today';
 let currentInventoryTab = 'products';
@@ -1174,7 +1230,7 @@ function handleProductTap(id) {
   if (p.has_options) {
     openCustomizeModal(p);
   } else {
-    addItemToTicket({ id: p.id, name: p.name, unitPrice: p.base_price, qty: 1, options: '', img: p.image_url });
+    addItemToTicket({ id: p.id, name: p.name, unitPrice: p.base_price, qty: 1, options: '', img: p.image_url, sizeId: 'medium', optionValueIds: [], addonIds: [] });
     showToast(p.name + ' added', 'check');
   }
 }
@@ -1182,11 +1238,11 @@ function handleProductTap(id) {
 // ===================================================================
 // CUSTOMIZATION MODAL
 // ===================================================================
-function openCustomizeModal(p) {
+async function openCustomizeModal(p) {
   customizeProduct = p;
   customQty = 1;
   customSize = 'medium';
-  customMilk = 'Whole Milk';
+  customSelectedValues = {};
   document.getElementById('cust-name').textContent = p.name;
   document.getElementById('cust-base-price').textContent = fmt(p.base_price) + ' base price';
   document.getElementById('cust-qty').textContent = '1';
@@ -1196,11 +1252,29 @@ function openCustomizeModal(p) {
     <button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id==='medium'?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all">${s.label}</button>
   `).join('');
 
-  document.getElementById('cust-milk-options').innerHTML = MILK_OPTIONS.map((m,i) => `
-    <button onclick="setCustMilk('${m}', this)" class="size-pill ${i===0?'selected':''} px-4 py-2 rounded-full border-2 border-outline-variant text-xs font-semibold transition-all">${m}</button>
-  `).join('');
+  // Load this product's option groups (e.g. Milk Type) fresh from the database
+  const { data: groups, error: gErr } = await sb.from('option_groups').select('*, option_values(*)').eq('product_id', p.id).order('sort_order');
+  customOptionGroups = gErr ? [] : (groups || []);
+  const groupsHtml = customOptionGroups.map(g => {
+    const values = (g.option_values || []).sort((a,b)=>a.sort_order-b.sort_order);
+    if (values.length && customSelectedValues[g.id] === undefined) customSelectedValues[g.id] = values[0].id;
+    return `
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">${g.name}</p>
+        <div class="flex flex-wrap gap-2" data-group="${g.id}">
+          ${values.map((v,i) => `
+            <button onclick="setCustOptionValue('${g.id}','${v.id}', this)" class="size-pill ${i===0?'selected':''} px-4 py-2 rounded-full border-2 border-outline-variant text-xs font-semibold transition-all">${v.label}${v.price_delta ? ` (+${fmt(v.price_delta)})` : ''}</button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('cust-option-groups').innerHTML = groupsHtml;
 
-  document.getElementById('cust-addons').innerHTML = ADDON_OPTIONS.map(a => `
+  // Load global add-ons fresh from the database
+  const { data: addons, error: aErr } = await sb.from('addons').select('*').eq('is_active', true).order('label');
+  customAddonsCache = aErr ? [] : (addons || []);
+  document.getElementById('cust-addons').innerHTML = customAddonsCache.map(a => `
     <label class="flex items-center justify-between p-3 bg-surface-container rounded-lg cursor-pointer">
       <span class="text-sm font-medium">${a.label} <span class="text-on-surface-variant">(+${fmt(a.price)})</span></span>
       <input type="checkbox" class="addon-cb w-4 h-4 accent-secondary" data-addon="${a.id}" onchange="updateCustomPrice()"/>
@@ -1217,10 +1291,11 @@ function setCustSize(sizeId, btn) {
   btn.classList.add('selected');
   updateCustomPrice();
 }
-function setCustMilk(milk, btn) {
-  customMilk = milk;
-  document.querySelectorAll('#cust-milk-options .size-pill').forEach(b => b.classList.remove('selected'));
+function setCustOptionValue(groupId, valueId, btn) {
+  customSelectedValues[groupId] = valueId;
+  document.querySelectorAll(`[data-group="${groupId}"] .size-pill`).forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
+  updateCustomPrice();
 }
 function custQtyChange(d) {
   customQty = Math.max(1, customQty + d);
@@ -1229,12 +1304,18 @@ function custQtyChange(d) {
 }
 function calcCustomUnitPrice() {
   const sizeAdd = SIZE_OPTIONS.find(s => s.id === customSize)?.add || 0;
+  let optionTotal = 0;
+  customOptionGroups.forEach(g => {
+    const selectedId = customSelectedValues[g.id];
+    const v = (g.option_values || []).find(x => x.id === selectedId);
+    if (v) optionTotal += (v.price_delta || 0);
+  });
   let addonTotal = 0;
   document.querySelectorAll('.addon-cb:checked').forEach(cb => {
-    const a = ADDON_OPTIONS.find(x => x.id === cb.dataset.addon);
+    const a = customAddonsCache.find(x => x.id === cb.dataset.addon);
     if (a) addonTotal += a.price;
   });
-  return customizeProduct.base_price + sizeAdd + addonTotal;
+  return customizeProduct.base_price + sizeAdd + optionTotal + addonTotal;
 }
 function updateCustomPrice() {
   if (!customizeProduct) return;
@@ -1245,15 +1326,26 @@ function confirmAddCustomItem() {
   if (customQty > stock) { showToast(`Only ${stock} left in stock`, 'error', true); return; }
   const unit = calcCustomUnitPrice();
   const sizeLabel = SIZE_OPTIONS.find(s => s.id === customSize)?.label.split(' · ')[0] || '';
-  const opts = [sizeLabel, customMilk];
+  const opts = [sizeLabel];
+  const optionValueIds = [];
+  customOptionGroups.forEach(g => {
+    const selectedId = customSelectedValues[g.id];
+    const v = (g.option_values || []).find(x => x.id === selectedId);
+    if (v) { opts.push(v.label); optionValueIds.push(v.id); }
+  });
+  const addonIds = [];
   document.querySelectorAll('.addon-cb:checked').forEach(cb => {
-    const a = ADDON_OPTIONS.find(x => x.id === cb.dataset.addon);
-    if (a) opts.push(a.label);
+    const a = customAddonsCache.find(x => x.id === cb.dataset.addon);
+    if (a) { opts.push(a.label); addonIds.push(a.id); }
   });
   const note = document.getElementById('cust-note').value.trim();
   if (note) opts.push('Note: ' + note);
 
-  addItemToTicket({ id: customizeProduct.id, name: customizeProduct.name, unitPrice: unit, qty: customQty, options: opts.join(', '), img: customizeProduct.image_url });
+  addItemToTicket({
+    id: customizeProduct.id, name: customizeProduct.name, unitPrice: unit, qty: customQty,
+    options: opts.join(', '), img: customizeProduct.image_url,
+    sizeId: customSize, optionValueIds, addonIds
+  });
   showToast(customizeProduct.name + ' added', 'check');
   closeCustomizeModal();
 }
@@ -1450,7 +1542,7 @@ async function completePayment() {
     const { error: liErr } = await sb.from('transaction_items').insert(lineItems);
     if (liErr) throw liErr;
 
-    // 3. Deduct stock per item + log each deduction
+    // 3. Deduct finished-product stock per item + log each deduction
     for (const i of ticket.items) {
       const current = inventoryCache[i.id]?.quantity_on_hand ?? 0;
       const newQty = Math.max(0, current - i.qty);
@@ -1461,6 +1553,18 @@ async function completePayment() {
       });
       if (inventoryCache[i.id]) inventoryCache[i.id].quantity_on_hand = newQty;
     }
+
+    // 4. Deduct raw-material supplies used by each item's recipe + chosen options/add-ons
+    //    (single atomic database call — scales by size, logs every deduction)
+    const supplyPayload = ticket.items.map(i => ({
+      product_id: i.id,
+      quantity: i.qty,
+      size_id: i.sizeId || 'medium',
+      option_value_ids: i.optionValueIds || [],
+      addon_ids: i.addonIds || []
+    }));
+    const { error: rpcErr } = await sb.rpc('process_sale_and_deduct', { p_items: supplyPayload, p_reference_id: txn.id });
+    if (rpcErr) console.error('Supply deduction failed:', rpcErr); // don't block the sale on this
 
     // Receipt UI
     const methodLabel = { cash:'Cash', gcash:'GCash' }[payMethod];
@@ -1743,6 +1847,7 @@ async function loadProductsManagement() {
         <td class="py-2 pr-4">${p.has_options ? 'Yes' : 'No'}</td>
         <td class="py-2 pr-4">${p.is_active ? `<span class="stock-pill bg-success/10 text-success">Active</span>` : `<span class="stock-pill bg-outline-variant/20 text-on-surface-variant">Hidden</span>`}</td>
         <td class="py-2 pr-4 text-right">
+          <button onclick='openRecipeModal(${JSON.stringify(p).replace(/'/g,"&apos;")})' class="text-primary font-semibold text-xs hover:underline mr-3">Recipe</button>
           <button onclick='openProductFormModal(${JSON.stringify(p).replace(/'/g,"&apos;")})' class="text-secondary font-semibold text-xs hover:underline mr-3">Edit</button>
           <button onclick="openDeleteConfirm('${p.id}','${p.name.replace(/'/g,"\\'")}')" class="text-error font-semibold text-xs hover:underline">Delete</button>
         </td>
@@ -1868,6 +1973,256 @@ async function confirmDeleteProduct() {
   } catch (e) {
     console.error(e);
     showToast('Delete failed', 'error', true);
+  }
+}
+
+// ===================================================================
+// RECIPE & OPTIONS MANAGEMENT (per product, admin only)
+// ===================================================================
+let recipeSuppliesCache = [];
+
+function unitLabel(u) { return u; }
+
+async function openRecipeModal(product) {
+  document.getElementById('recipe-product-id').value = product.id;
+  document.getElementById('recipe-product-name').textContent = product.name;
+
+  const { data: supplies, error } = await sb.from('supplies').select('id,name,unit').order('name');
+  if (error) { showToast('Failed to load supplies', 'error', true); return; }
+  recipeSuppliesCache = supplies || [];
+
+  const supplyOptionsHtml = recipeSuppliesCache.length
+    ? recipeSuppliesCache.map(s => `<option value="${s.id}">${s.name} (${s.unit})</option>`).join('')
+    : `<option value="">No supplies yet — add some in Inventory first</option>`;
+  document.getElementById('recipe-new-supply').innerHTML = supplyOptionsHtml;
+  document.getElementById('recipe-new-qty').value = '';
+  document.getElementById('new-group-name').value = '';
+
+  await renderRecipeItems();
+  await renderOptionGroups();
+  document.getElementById('modal-recipe').classList.add('open');
+}
+
+async function renderRecipeItems() {
+  const productId = document.getElementById('recipe-product-id').value;
+  const { data, error } = await sb.from('recipe_items').select('*, supplies(name,unit)').eq('product_id', productId).order('created_at');
+  const list = document.getElementById('recipe-items-list');
+  if (error) { list.innerHTML = `<p class="text-xs text-error">Failed to load recipe.</p>`; return; }
+  if (!data.length) { list.innerHTML = `<p class="text-xs text-on-surface-variant">No ingredients added yet.</p>`; return; }
+  list.innerHTML = data.map(r => `
+    <div class="flex items-center justify-between bg-surface-container rounded-lg px-3 py-2 text-sm">
+      <span>${r.supplies?.name || 'Unknown supply'} — <strong>${r.quantity_per_base}${r.supplies?.unit || ''}</strong></span>
+      <button onclick="removeRecipeItem('${r.id}')" class="text-error hover:bg-error/10 rounded-full p-1">
+        <span class="material-symbols-outlined text-sm">close</span>
+      </button>
+    </div>
+  `).join('');
+}
+
+async function addRecipeItem() {
+  const productId = document.getElementById('recipe-product-id').value;
+  const supplyId = document.getElementById('recipe-new-supply').value;
+  const qty = parseFloat(document.getElementById('recipe-new-qty').value);
+  if (!supplyId) { showToast('Pick a supply', 'error', true); return; }
+  if (isNaN(qty) || qty <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
+  try {
+    const { error } = await sb.from('recipe_items').insert({ product_id: productId, supply_id: supplyId, quantity_per_base: qty });
+    if (error) throw error;
+    document.getElementById('recipe-new-qty').value = '';
+    await renderRecipeItems();
+    showToast('Ingredient added', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to add ingredient', 'error', true);
+  }
+}
+
+async function removeRecipeItem(id) {
+  try {
+    const { error } = await sb.from('recipe_items').delete().eq('id', id);
+    if (error) throw error;
+    await renderRecipeItems();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to remove ingredient', 'error', true);
+  }
+}
+
+async function renderOptionGroups() {
+  const productId = document.getElementById('recipe-product-id').value;
+  const { data, error } = await sb.from('option_groups').select('*, option_values(*)').eq('product_id', productId).order('sort_order');
+  const list = document.getElementById('option-groups-list');
+  if (error) { list.innerHTML = `<p class="text-xs text-error">Failed to load options.</p>`; return; }
+  if (!data.length) { list.innerHTML = `<p class="text-xs text-on-surface-variant">No option groups yet.</p>`; return; }
+
+  const supplyOptionsHtml = recipeSuppliesCache.map(s => `<option value="${s.id}">${s.name} (${s.unit})</option>`).join('');
+
+  list.innerHTML = data.map(g => {
+    const values = (g.option_values || []).sort((a,b)=>a.sort_order-b.sort_order);
+    const valuesHtml = values.map(v => {
+      const linkedSupply = recipeSuppliesCache.find(s => s.id === v.supply_id);
+      const linkText = linkedSupply ? ` → ${linkedSupply.name} (${v.quantity_per_base || 0}${linkedSupply.unit})` : '';
+      const priceText = v.price_delta ? ` (+${fmt(v.price_delta)})` : '';
+      return `
+        <div class="flex items-center justify-between bg-surface-container-lowest rounded-lg px-2 py-1.5 text-xs">
+          <span>${v.label}${priceText}${linkText}</span>
+          <button onclick="removeOptionValue('${v.id}')" class="text-error hover:bg-error/10 rounded-full p-1">
+            <span class="material-symbols-outlined text-xs">close</span>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="bg-surface-container rounded-xl p-4">
+        <div class="flex justify-between items-center mb-2">
+          <span class="font-semibold text-sm text-primary">${g.name}</span>
+          <button onclick="removeOptionGroup('${g.id}')" class="text-error hover:bg-error/10 rounded-full p-1">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </button>
+        </div>
+        <div class="space-y-1 mb-3">${valuesHtml || '<p class="text-xs text-on-surface-variant">No choices yet.</p>'}</div>
+        <div class="grid grid-cols-2 gap-1.5 mb-1.5">
+          <input id="nvl-${g.id}" placeholder="Choice label, e.g. Skim Milk" class="bg-surface-container-lowest rounded-lg px-2 py-1.5 text-xs border border-outline-variant/30 outline-none"/>
+          <input id="nvp-${g.id}" type="number" step="0.01" placeholder="Price add (optional)" class="bg-surface-container-lowest rounded-lg px-2 py-1.5 text-xs border border-outline-variant/30 outline-none"/>
+          <select id="nvs-${g.id}" class="bg-surface-container-lowest rounded-lg px-2 py-1.5 text-xs border border-outline-variant/30 outline-none">
+            <option value="">No ingredient link</option>
+            ${supplyOptionsHtml}
+          </select>
+          <input id="nvq-${g.id}" type="number" step="0.01" placeholder="Qty (at Medium)" class="bg-surface-container-lowest rounded-lg px-2 py-1.5 text-xs border border-outline-variant/30 outline-none"/>
+        </div>
+        <button onclick="addOptionValue('${g.id}')" class="w-full py-1.5 bg-secondary text-white rounded-lg text-xs font-semibold">Add Choice</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function addOptionGroup() {
+  const productId = document.getElementById('recipe-product-id').value;
+  const name = document.getElementById('new-group-name').value.trim();
+  if (!name) { showToast('Enter a group name', 'error', true); return; }
+  try {
+    const { error } = await sb.from('option_groups').insert({ product_id: productId, name });
+    if (error) throw error;
+    document.getElementById('new-group-name').value = '';
+    await renderOptionGroups();
+    showToast('Option group added', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to add group', 'error', true);
+  }
+}
+
+async function removeOptionGroup(id) {
+  if (!confirm('Remove this option group and all its choices?')) return;
+  try {
+    const { error } = await sb.from('option_groups').delete().eq('id', id);
+    if (error) throw error;
+    await renderOptionGroups();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to remove group', 'error', true);
+  }
+}
+
+async function addOptionValue(groupId) {
+  const label = document.getElementById(`nvl-${groupId}`).value.trim();
+  const priceDelta = parseFloat(document.getElementById(`nvp-${groupId}`).value) || 0;
+  const supplyId = document.getElementById(`nvs-${groupId}`).value || null;
+  const qty = parseFloat(document.getElementById(`nvq-${groupId}`).value);
+  if (!label) { showToast('Enter a choice label', 'error', true); return; }
+  try {
+    const { error } = await sb.from('option_values').insert({
+      group_id: groupId, label, price_delta: priceDelta,
+      supply_id: supplyId || null,
+      quantity_per_base: supplyId && !isNaN(qty) ? qty : null
+    });
+    if (error) throw error;
+    await renderOptionGroups();
+    showToast('Choice added', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to add choice', 'error', true);
+  }
+}
+
+async function removeOptionValue(id) {
+  try {
+    const { error } = await sb.from('option_values').delete().eq('id', id);
+    if (error) throw error;
+    await renderOptionGroups();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to remove choice', 'error', true);
+  }
+}
+
+// ===================================================================
+// ADD-ONS MANAGEMENT (global, admin only)
+// ===================================================================
+async function openManageAddonsModal() {
+  const { data: supplies } = await sb.from('supplies').select('id,name,unit').order('name');
+  recipeSuppliesCache = supplies || [];
+  document.getElementById('new-addon-supply').innerHTML =
+    `<option value="">No ingredient link</option>` + recipeSuppliesCache.map(s => `<option value="${s.id}">${s.name} (${s.unit})</option>`).join('');
+  document.getElementById('new-addon-label').value = '';
+  document.getElementById('new-addon-price').value = '';
+  document.getElementById('new-addon-qty').value = '';
+  await renderAddonsList();
+  document.getElementById('modal-manage-addons').classList.add('open');
+}
+
+async function renderAddonsList() {
+  const { data, error } = await sb.from('addons').select('*').order('label');
+  const list = document.getElementById('addons-list');
+  if (error) { list.innerHTML = `<p class="text-xs text-error">Failed to load add-ons.</p>`; return; }
+  if (!data.length) { list.innerHTML = `<p class="text-sm text-on-surface-variant">No add-ons yet.</p>`; return; }
+  list.innerHTML = data.map(a => {
+    const linkedSupply = recipeSuppliesCache.find(s => s.id === a.supply_id);
+    const linkText = linkedSupply ? ` → ${linkedSupply.name} (${a.quantity_per_unit || 0}${linkedSupply.unit})` : '';
+    return `
+      <div class="flex items-center justify-between p-3 bg-surface-container rounded-xl">
+        <span class="text-sm"><strong>${a.label}</strong> (+${fmt(a.price)})${linkText}</span>
+        <button onclick="removeAddon('${a.id}')" class="text-error hover:bg-error/10 rounded-full p-1.5">
+          <span class="material-symbols-outlined text-base">delete</span>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function addAddon() {
+  const label = document.getElementById('new-addon-label').value.trim();
+  const price = parseFloat(document.getElementById('new-addon-price').value) || 0;
+  const supplyId = document.getElementById('new-addon-supply').value || null;
+  const qty = parseFloat(document.getElementById('new-addon-qty').value);
+  if (!label) { showToast('Enter an add-on name', 'error', true); return; }
+  try {
+    const { error } = await sb.from('addons').insert({
+      label, price, supply_id: supplyId || null,
+      quantity_per_unit: supplyId && !isNaN(qty) ? qty : null
+    });
+    if (error) throw error;
+    document.getElementById('new-addon-label').value = '';
+    document.getElementById('new-addon-price').value = '';
+    document.getElementById('new-addon-qty').value = '';
+    await renderAddonsList();
+    showToast('Add-on added', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to add add-on', 'error', true);
+  }
+}
+
+async function removeAddon(id) {
+  if (!confirm('Remove this add-on?')) return;
+  try {
+    const { error } = await sb.from('addons').delete().eq('id', id);
+    if (error) throw error;
+    await renderAddonsList();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to remove add-on', 'error', true);
   }
 }
 
