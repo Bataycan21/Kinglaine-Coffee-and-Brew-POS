@@ -293,6 +293,9 @@
         <p class="text-sm text-on-surface-variant">Add, edit, or remove menu items</p>
       </div>
       <div class="flex items-center gap-3">
+        <button onclick="openManageSizesModal()" class="flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">straighten</span> Manage Sizes
+        </button>
         <button onclick="openManageAddonsModal()" class="flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">tune</span> Manage Add-ons
         </button>
@@ -743,6 +746,20 @@
   </div>
 </div>
 
+<!-- ===== MODAL: MANAGE SIZES (global, admin only) ===== -->
+<div class="modal-overlay" id="modal-manage-sizes">
+  <div class="bg-surface-container-lowest rounded-2xl w-[420px] shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">Manage Sizes</h3>
+      <button onclick="closeModal('modal-manage-sizes')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 space-y-3" id="sizes-list"></div>
+    <div class="p-6 border-t border-outline-variant/20">
+      <button onclick="saveSizeChanges()" id="save-sizes-btn" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL: MANAGE ADD-ONS (global, admin only) ===== -->
 <div class="modal-overlay" id="modal-manage-addons">
   <div class="bg-surface-container-lowest rounded-2xl w-[480px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
@@ -760,7 +777,10 @@
         </select>
         <input id="new-addon-qty" type="number" min="0" step="0.01" placeholder="Qty used" class="w-24 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
       </div>
-      <button onclick="addAddon()" class="w-full py-2.5 bg-primary text-white rounded-lg text-sm font-semibold">Add Add-on</button>
+      <div class="flex gap-2">
+        <button onclick="addAddon()" id="addon-submit-btn" class="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold">Add Add-on</button>
+        <button onclick="cancelEditAddon()" id="addon-cancel-btn" class="px-4 py-2.5 border-2 border-outline-variant rounded-lg text-sm font-semibold" style="display:none">Cancel</button>
+      </div>
     </div>
   </div>
 </div>
@@ -803,13 +823,14 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const TAX_RATE = 0.12;
 const CURRENCY = '₱';
-const SIZE_OPTIONS = [
-  { id:'small', label:'S · 12oz', add:-0.50 },
-  { id:'medium', label:'M · 16oz', add:0 },
-  { id:'large', label:'L · 20oz', add:0.75 }
-];
-// Note: sizes' price deltas mirror the `sizes` table in Supabase (used there for
-// scaling recipe quantities). Milk options and add-ons are now loaded live from
+let SIZE_OPTIONS = []; // loaded from the `sizes` table — see loadSizeOptions()
+async function loadSizeOptions() {
+  const { data, error } = await sb.from('sizes').select('*').order('sort_order');
+  if (error) { console.error(error); return; }
+  SIZE_OPTIONS = data.map(s => ({ id: s.id, label: s.label, add: Number(s.price_delta) }));
+}
+// Sizes, milk options, and add-ons are all loaded live from the database
+// (sizes / option_groups+option_values / addons) — see loadSizeOptions() and
 // the database (option_groups/option_values and addons) — see openCustomizeModal().
 const CATEGORIES = [
   { id:'coffee', label:'Coffee', icon:'coffee' },
@@ -879,6 +900,7 @@ function enterApp() {
   document.getElementById('current-user-label').textContent = currentUser.full_name + ' (' + currentUser.role + ')';
   applyRoleVisibility();
   tickClock();
+  loadSizeOptions();
   showView('tables');
 }
 
@@ -1297,6 +1319,7 @@ function handleProductTap(id) {
 // CUSTOMIZATION MODAL
 // ===================================================================
 async function openCustomizeModal(p) {
+  if (SIZE_OPTIONS.length === 0) await loadSizeOptions();
   customizeProduct = p;
   customQty = 1;
   customSize = 'medium';
@@ -2039,12 +2062,15 @@ async function confirmDeleteProduct() {
 // RECIPE & OPTIONS MANAGEMENT (per product, admin only)
 // ===================================================================
 let recipeSuppliesCache = [];
+let recipeItemsCache = [];
+let editingRecipeItemId = null;
 
 function unitLabel(u) { return u; }
 
 async function openRecipeModal(product) {
   document.getElementById('recipe-product-id').value = product.id;
   document.getElementById('recipe-product-name').textContent = product.name;
+  editingRecipeItemId = null;
 
   const { data: supplies, error } = await sb.from('supplies').select('id,name,unit').order('name');
   if (error) { showToast('Failed to load supplies', 'error', true); return; }
@@ -2065,17 +2091,61 @@ async function openRecipeModal(product) {
 async function renderRecipeItems() {
   const productId = document.getElementById('recipe-product-id').value;
   const { data, error } = await sb.from('recipe_items').select('*, supplies(name,unit)').eq('product_id', productId).order('created_at');
+  if (error) { document.getElementById('recipe-items-list').innerHTML = `<p class="text-xs text-error">Failed to load recipe.</p>`; return; }
+  recipeItemsCache = data;
+  renderRecipeItemsFromCache();
+}
+
+function renderRecipeItemsFromCache() {
   const list = document.getElementById('recipe-items-list');
-  if (error) { list.innerHTML = `<p class="text-xs text-error">Failed to load recipe.</p>`; return; }
-  if (!data.length) { list.innerHTML = `<p class="text-xs text-on-surface-variant">No ingredients added yet.</p>`; return; }
-  list.innerHTML = data.map(r => `
-    <div class="flex items-center justify-between bg-surface-container rounded-lg px-3 py-2 text-sm">
-      <span>${r.supplies?.name || 'Unknown supply'} — <strong>${r.quantity_per_base}${r.supplies?.unit || ''}</strong></span>
-      <button onclick="removeRecipeItem('${r.id}')" class="text-error hover:bg-error/10 rounded-full p-1">
-        <span class="material-symbols-outlined text-sm">close</span>
-      </button>
-    </div>
-  `).join('');
+  if (!recipeItemsCache.length) { list.innerHTML = `<p class="text-xs text-on-surface-variant">No ingredients added yet.</p>`; return; }
+  list.innerHTML = recipeItemsCache.map(r => {
+    const unit = r.supplies?.unit || '';
+    if (editingRecipeItemId === r.id) {
+      return `
+        <div class="flex items-center justify-between bg-surface-container rounded-lg px-3 py-2 text-sm gap-2">
+          <span>${r.supplies?.name || 'Unknown supply'}</span>
+          <div class="flex items-center gap-1.5">
+            <input type="number" min="0.01" step="0.01" id="edit-recipe-qty-${r.id}" value="${r.quantity_per_base}" class="w-20 bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2 py-1 text-xs outline-none"/>
+            <span class="text-xs text-on-surface-variant">${unit}</span>
+            <button onclick="saveRecipeItemQty('${r.id}')" class="text-success text-xs font-semibold hover:underline">Save</button>
+            <button onclick="cancelEditRecipeItem()" class="text-on-surface-variant text-xs hover:underline">Cancel</button>
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="flex items-center justify-between bg-surface-container rounded-lg px-3 py-2 text-sm">
+        <span>${r.supplies?.name || 'Unknown supply'} — <strong>${r.quantity_per_base}${unit}</strong></span>
+        <div class="flex items-center gap-1">
+          <button onclick="startEditRecipeItem('${r.id}')" class="text-secondary hover:bg-secondary/10 rounded-full p-1">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </button>
+          <button onclick="removeRecipeItem('${r.id}')" class="text-error hover:bg-error/10 rounded-full p-1">
+            <span class="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function startEditRecipeItem(id) { editingRecipeItemId = id; renderRecipeItemsFromCache(); }
+function cancelEditRecipeItem() { editingRecipeItemId = null; renderRecipeItemsFromCache(); }
+
+async function saveRecipeItemQty(id) {
+  const val = parseFloat(document.getElementById(`edit-recipe-qty-${id}`).value);
+  if (isNaN(val) || val <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
+  try {
+    const { error } = await sb.from('recipe_items').update({ quantity_per_base: val }).eq('id', id);
+    if (error) throw error;
+    editingRecipeItemId = null;
+    await renderRecipeItems();
+    showToast('Ingredient updated', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to update ingredient', 'error', true);
+  }
 }
 
 async function addRecipeItem() {
@@ -2217,16 +2287,83 @@ async function removeOptionValue(id) {
 }
 
 // ===================================================================
+// SIZES MANAGEMENT (global, admin only)
+// ===================================================================
+let pendingSizeChanges = {}; // { sizeId: { price_delta, multiplier } }
+
+async function openManageSizesModal() {
+  pendingSizeChanges = {};
+  await renderSizesList();
+  document.getElementById('modal-manage-sizes').classList.add('open');
+}
+
+async function renderSizesList() {
+  const { data, error } = await sb.from('sizes').select('*').order('sort_order');
+  const list = document.getElementById('sizes-list');
+  if (error) { list.innerHTML = `<p class="text-xs text-error">Failed to load sizes.</p>`; return; }
+  list.innerHTML = data.map(s => `
+    <div class="flex items-center justify-between bg-surface-container rounded-xl p-3">
+      <span class="font-semibold text-sm text-primary">${s.label}</span>
+      <div class="flex items-center gap-2">
+        <div class="flex flex-col items-center">
+          <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Price Add</label>
+          <input type="number" step="0.01" id="size-price-${s.id}" value="${s.price_delta}"
+            onchange="stageSizeChange('${s.id}','price_delta',this.value)"
+            class="w-20 bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2 py-1 text-xs text-center outline-none"/>
+        </div>
+        <div class="flex flex-col items-center">
+          <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Ingredient ×</label>
+          <input type="number" step="0.05" id="size-mult-${s.id}" value="${s.multiplier}"
+            onchange="stageSizeChange('${s.id}','multiplier',this.value)"
+            class="w-20 bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2 py-1 text-xs text-center outline-none"/>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function stageSizeChange(id, field, value) {
+  const num = parseFloat(value);
+  if (isNaN(num)) return;
+  if (!pendingSizeChanges[id]) pendingSizeChanges[id] = {};
+  pendingSizeChanges[id][field] = num;
+}
+
+async function saveSizeChanges() {
+  const changes = Object.entries(pendingSizeChanges);
+  if (changes.length === 0) { closeModal('modal-manage-sizes'); return; }
+  const btn = document.getElementById('save-sizes-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await Promise.all(changes.map(([id, fields]) =>
+      sb.from('sizes').update(fields).eq('id', id).then(({ error }) => { if (error) throw error; })
+    ));
+    pendingSizeChanges = {};
+    await loadSizeOptions();
+    closeModal('modal-manage-sizes');
+    showToast('Sizes updated', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to save sizes', 'error', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+  }
+}
+
+// ===================================================================
 // ADD-ONS MANAGEMENT (global, admin only)
 // ===================================================================
+let addonsCache = [];
+let editingAddonId = null;
+
 async function openManageAddonsModal() {
   const { data: supplies } = await sb.from('supplies').select('id,name,unit').order('name');
   recipeSuppliesCache = supplies || [];
   document.getElementById('new-addon-supply').innerHTML =
     `<option value="">No ingredient link</option>` + recipeSuppliesCache.map(s => `<option value="${s.id}">${s.name} (${s.unit})</option>`).join('');
-  document.getElementById('new-addon-label').value = '';
-  document.getElementById('new-addon-price').value = '';
-  document.getElementById('new-addon-qty').value = '';
+  cancelEditAddon();
   await renderAddonsList();
   document.getElementById('modal-manage-addons').classList.add('open');
 }
@@ -2235,6 +2372,7 @@ async function renderAddonsList() {
   const { data, error } = await sb.from('addons').select('*').order('label');
   const list = document.getElementById('addons-list');
   if (error) { list.innerHTML = `<p class="text-xs text-error">Failed to load add-ons.</p>`; return; }
+  addonsCache = data;
   if (!data.length) { list.innerHTML = `<p class="text-sm text-on-surface-variant">No add-ons yet.</p>`; return; }
   list.innerHTML = data.map(a => {
     const linkedSupply = recipeSuppliesCache.find(s => s.id === a.supply_id);
@@ -2242,12 +2380,37 @@ async function renderAddonsList() {
     return `
       <div class="flex items-center justify-between p-3 bg-surface-container rounded-xl">
         <span class="text-sm"><strong>${a.label}</strong> (+${fmt(a.price)})${linkText}</span>
-        <button onclick="removeAddon('${a.id}')" class="text-error hover:bg-error/10 rounded-full p-1.5">
-          <span class="material-symbols-outlined text-base">delete</span>
-        </button>
+        <div class="flex items-center gap-1">
+          <button onclick='startEditAddon(${JSON.stringify(a).replace(/'/g,"&apos;")})' class="text-secondary hover:bg-secondary/10 rounded-full p-1.5">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
+          <button onclick="removeAddon('${a.id}')" class="text-error hover:bg-error/10 rounded-full p-1.5">
+            <span class="material-symbols-outlined text-base">delete</span>
+          </button>
+        </div>
       </div>
     `;
   }).join('');
+}
+
+function startEditAddon(a) {
+  editingAddonId = a.id;
+  document.getElementById('new-addon-label').value = a.label;
+  document.getElementById('new-addon-price').value = a.price;
+  document.getElementById('new-addon-supply').value = a.supply_id || '';
+  document.getElementById('new-addon-qty').value = a.quantity_per_unit ?? '';
+  document.getElementById('addon-submit-btn').textContent = 'Save Changes';
+  document.getElementById('addon-cancel-btn').style.display = 'block';
+}
+
+function cancelEditAddon() {
+  editingAddonId = null;
+  document.getElementById('new-addon-label').value = '';
+  document.getElementById('new-addon-price').value = '';
+  document.getElementById('new-addon-supply').value = '';
+  document.getElementById('new-addon-qty').value = '';
+  document.getElementById('addon-submit-btn').textContent = 'Add Add-on';
+  document.getElementById('addon-cancel-btn').style.display = 'none';
 }
 
 async function addAddon() {
@@ -2256,20 +2419,21 @@ async function addAddon() {
   const supplyId = document.getElementById('new-addon-supply').value || null;
   const qty = parseFloat(document.getElementById('new-addon-qty').value);
   if (!label) { showToast('Enter an add-on name', 'error', true); return; }
+  const payload = {
+    label, price, supply_id: supplyId || null,
+    quantity_per_unit: supplyId && !isNaN(qty) ? qty : null
+  };
   try {
-    const { error } = await sb.from('addons').insert({
-      label, price, supply_id: supplyId || null,
-      quantity_per_unit: supplyId && !isNaN(qty) ? qty : null
-    });
+    const { error } = editingAddonId
+      ? await sb.from('addons').update(payload).eq('id', editingAddonId)
+      : await sb.from('addons').insert(payload);
     if (error) throw error;
-    document.getElementById('new-addon-label').value = '';
-    document.getElementById('new-addon-price').value = '';
-    document.getElementById('new-addon-qty').value = '';
+    showToast(editingAddonId ? 'Add-on updated' : 'Add-on added', 'check');
+    cancelEditAddon();
     await renderAddonsList();
-    showToast('Add-on added', 'check');
   } catch (e) {
     console.error(e);
-    showToast('Failed to add add-on', 'error', true);
+    showToast('Failed to save add-on', 'error', true);
   }
 }
 
@@ -2278,6 +2442,7 @@ async function removeAddon(id) {
   try {
     const { error } = await sb.from('addons').delete().eq('id', id);
     if (error) throw error;
+    if (editingAddonId === id) cancelEditAddon();
     await renderAddonsList();
   } catch (e) {
     console.error(e);
