@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script id="tailwind-config">
   tailwind.config = {
     darkMode: "class",
@@ -229,59 +231,37 @@
   <div class="view flex-col flex-1 overflow-hidden" id="view-inventory">
     <div class="px-8 py-5 flex-shrink-0 border-b border-outline-variant/30 flex justify-between items-center">
       <div>
-        <h1 class="font-bold text-2xl text-primary">Inventory</h1>
-        <p class="text-sm text-on-surface-variant">Stock on hand across menu items and raw materials</p>
+        <h1 class="font-bold text-2xl text-primary">Supplies Inventory</h1>
+        <p class="text-sm text-on-surface-variant">Raw materials, tracked in bulk (menu items are made to order — no manual stock)</p>
       </div>
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2 text-sm bg-error-container text-on-error-container px-3 py-1.5 rounded-full" id="low-stock-badge" style="display:none">
           <span class="material-symbols-outlined text-base">warning</span> <span id="low-stock-count">0</span> low stock
         </div>
-        <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95" style="display:none">
+        <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">add</span> Add Supply
         </button>
-        <button onclick="refreshInventoryTab()" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
+        <button onclick="loadSupplies()" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
           <span class="material-symbols-outlined text-sm">refresh</span> Refresh
         </button>
       </div>
     </div>
-    <div class="px-8 pt-5 flex-shrink-0">
-      <div class="flex items-center gap-2 bg-surface-container-low rounded-xl p-1 w-fit" id="inventory-tab-bar">
-        <button onclick="switchInventoryTab('products')" class="inventory-tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="products">Menu Items</button>
-        <button onclick="switchInventoryTab('supplies')" class="inventory-tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="supplies">Supplies</button>
-      </div>
-    </div>
     <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
-      <div id="inventory-tab-products">
-        <div id="inventory-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
-        <table class="w-full text-left" id="inventory-table" style="display:none">
-          <thead>
-            <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
-              <th class="py-3 pr-4">Product</th>
-              <th class="py-3 pr-4">Category</th>
-              <th class="py-3 pr-4">On Hand</th>
-              <th class="py-3 pr-4">Status</th>
-              <th class="py-3 pr-4 admin-only">Restock</th>
-            </tr>
-          </thead>
-          <tbody id="inventory-tbody"></tbody>
-        </table>
-      </div>
-      <div id="inventory-tab-supplies" style="display:none">
-        <div id="supplies-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
-        <table class="w-full text-left" id="supplies-table" style="display:none">
-          <thead>
-            <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
-              <th class="py-3 pr-4">Supply</th>
-              <th class="py-3 pr-4">Unit</th>
-              <th class="py-3 pr-4">On Hand</th>
-              <th class="py-3 pr-4">Status</th>
-              <th class="py-3 pr-4">Restock</th>
-              <th class="py-3 pr-4 admin-only text-right">Remove</th>
-            </tr>
-          </thead>
-          <tbody id="supplies-tbody"></tbody>
-        </table>
-      </div>
+      <div id="supplies-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+      <table class="w-full text-left" id="supplies-table" style="display:none">
+        <thead>
+          <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+            <th class="py-3 pr-4">Supply</th>
+            <th class="py-3 pr-4">Unit</th>
+            <th class="py-3 pr-4">On Hand</th>
+            <th class="py-3 pr-4">Cost/Unit</th>
+            <th class="py-3 pr-4">Status</th>
+            <th class="py-3 pr-4">Restock</th>
+            <th class="py-3 pr-4 admin-only text-right">Remove</th>
+          </tr>
+        </thead>
+        <tbody id="supplies-tbody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -314,7 +294,8 @@
             <th class="py-3 pr-4">Category</th>
             <th class="py-3 pr-4">Price</th>
             <th class="py-3 pr-4">Has Options</th>
-            <th class="py-3 pr-4">Status</th>
+            <th class="py-3 pr-4">Visible</th>
+            <th class="py-3 pr-4">Stock Status</th>
             <th class="py-3 pr-4 text-right">Actions</th>
           </tr>
         </thead>
@@ -356,17 +337,32 @@
     <div class="px-8 py-5 flex-shrink-0 border-b border-outline-variant/30 flex justify-between items-center">
       <div>
         <h1 class="font-bold text-2xl text-primary">Reports</h1>
-        <p class="text-sm text-on-surface-variant">Sales, inventory, and transaction history</p>
+        <p class="text-sm text-on-surface-variant">Sales, income, and inventory reporting</p>
       </div>
-      <div class="flex items-center gap-2 bg-surface-container-low rounded-xl p-1" id="report-range-tabs">
-        <button onclick="setReportRange('today')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="today">Today</button>
-        <button onclick="setReportRange('week')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="week">7 Days</button>
-        <button onclick="setReportRange('all')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="all">All Time</button>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 bg-surface-container-low rounded-xl p-1" id="report-range-tabs">
+          <button onclick="setReportRange('today')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="today">Today</button>
+          <button onclick="setReportRange('week')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="week">7 Days</button>
+          <button onclick="setReportRange('all')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="all">All Time</button>
+        </div>
+        <button onclick="exportReportPDF()" class="flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">picture_as_pdf</span> Export PDF
+        </button>
+      </div>
+    </div>
+    <div class="px-8 pt-5 flex-shrink-0">
+      <div class="flex items-center gap-2 bg-surface-container-low rounded-xl p-1 w-fit" id="report-type-tabs">
+        <button onclick="setReportType('general')" class="report-type-btn px-4 py-2 rounded-lg text-sm font-semibold" data-type="general">General</button>
+        <button onclick="setReportType('income')" class="report-type-btn px-4 py-2 rounded-lg text-sm font-semibold" data-type="income">Income</button>
+        <button onclick="setReportType('inventory')" class="report-type-btn px-4 py-2 rounded-lg text-sm font-semibold" data-type="inventory">Inventory</button>
       </div>
     </div>
     <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
       <div id="reports-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
       <div id="reports-content" style="display:none">
+
+      <!-- ===== GENERAL REPORT ===== -->
+      <div id="report-tab-general">
         <div class="grid grid-cols-4 gap-5 mb-8">
           <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
             <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Gross Sales</p>
@@ -417,6 +413,93 @@
             <tbody id="rep-transaction-log"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- ===== INCOME REPORT ===== -->
+      <div id="report-tab-income" style="display:none">
+        <div class="grid grid-cols-4 gap-5 mb-8">
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Net Sales</p>
+            <p class="text-3xl font-bold text-primary" id="inc-net-sales">₱0.00</p>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">VAT Collected (12%)</p>
+            <p class="text-3xl font-bold text-primary" id="inc-vat">₱0.00</p>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Total Sales (incl. VAT)</p>
+            <p class="text-3xl font-bold text-primary" id="inc-total-sales">₱0.00</p>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border-2" id="inc-margin-card">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Profit Margin</p>
+            <p class="text-3xl font-bold" id="inc-margin">0%</p>
+            <p class="text-xs mt-1" id="inc-margin-note">Target: 35–50%</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6 mb-8">
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <h3 class="font-bold text-primary mb-4">Cost of Sales</h3>
+            <div class="space-y-3 text-sm">
+              <div class="flex justify-between"><span class="text-on-surface-variant">Ingredients used (this period)</span><span class="font-semibold text-primary" id="inc-cogs">₱0.00</span></div>
+              <div class="flex justify-between"><span class="text-on-surface-variant">Current inventory value</span><span class="font-semibold text-primary" id="inc-inventory-value">₱0.00</span></div>
+            </div>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <h3 class="font-bold text-primary mb-4">Total Payment Breakdown</h3>
+            <div id="inc-payment-breakdown" class="space-y-3"></div>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-bold text-primary">Operating Expenses</h3>
+              <button onclick="openAddExpenseModal()" class="admin-only text-xs font-semibold text-secondary hover:underline">+ Add</button>
+            </div>
+            <div id="inc-expenses-breakdown" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+          <h3 class="font-bold text-primary mb-4">Profit Summary</h3>
+          <table class="w-full text-sm">
+            <tbody>
+              <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">Net Sales</td><td class="py-2 text-right font-semibold" id="inc-summary-sales">₱0.00</td></tr>
+              <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">− Cost of Sales</td><td class="py-2 text-right font-semibold text-error" id="inc-summary-cogs">₱0.00</td></tr>
+              <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">− Operating Expenses</td><td class="py-2 text-right font-semibold text-error" id="inc-summary-opex">₱0.00</td></tr>
+              <tr><td class="py-2 font-bold text-primary">Net Profit</td><td class="py-2 text-right font-bold text-primary" id="inc-summary-profit">₱0.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== INVENTORY REPORT ===== -->
+      <div id="report-tab-inventory" style="display:none">
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 mb-8">
+          <h3 class="font-bold text-primary mb-4">Sales by Size</h3>
+          <div id="inv-size-breakdown" class="grid grid-cols-3 gap-4"></div>
+        </div>
+
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 mb-8">
+          <h3 class="font-bold text-primary mb-4">Top Selling Items</h3>
+          <div id="inv-top-items" class="space-y-3"></div>
+        </div>
+
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+          <h3 class="font-bold text-primary mb-4">Supplies Usage</h3>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
+                <th class="py-2 pr-4">Supply</th>
+                <th class="py-2 pr-4 text-right">Used (period)</th>
+                <th class="py-2 pr-4 text-right">Restocked (period)</th>
+                <th class="py-2 pr-4 text-right">Cost (used)</th>
+                <th class="py-2 pr-4 text-right">Current Level</th>
+              </tr>
+            </thead>
+            <tbody id="inv-supplies-usage"></tbody>
+          </table>
+        </div>
+      </div>
+
       </div>
     </div>
   </div>
@@ -585,9 +668,8 @@
         </div>
         <input type="hidden" id="pf-image"/>
       </div>
-      <div>
-        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Starting Stock (new products only)</label>
-        <input id="pf-stock" type="number" min="0" step="1" value="0" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      <div class="bg-surface-container rounded-lg px-3 py-2 text-xs text-on-surface-variant">
+        Stock is no longer set manually — availability is calculated automatically from the ingredients linked in <strong>Recipe</strong> (after saving).
       </div>
       <label class="flex items-center gap-2 cursor-pointer">
         <input id="pf-has-options" type="checkbox" class="w-4 h-4 accent-secondary"/>
@@ -692,11 +774,39 @@
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Low Stock Threshold</label>
         <input id="sup-threshold" type="number" min="0" step="0.01" value="5" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
       </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Cost per Unit (₱)</label>
+        <input id="sup-cost" type="number" min="0" step="0.01" value="0" placeholder="e.g. cost per liter or per kg" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
       <p id="supply-form-error" class="text-error text-xs font-semibold h-4"></p>
     </div>
     <div class="p-6 border-t border-outline-variant/20">
       <button onclick="saveSupplyForm()" id="save-supply-btn" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Add Supply</button>
     </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: ADD OPERATING EXPENSE (admin only) ===== -->
+<div class="modal-overlay" id="modal-add-expense">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-lg text-primary">Add Operating Expense</h3>
+      <button onclick="closeModal('modal-add-expense')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Category</label>
+    <select id="exp-category" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-3">
+      <option value="manpower">Manpower</option>
+      <option value="maintenance">Maintenance</option>
+      <option value="infrastructure">Infrastructure</option>
+      <option value="other">Other</option>
+    </select>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Description</label>
+    <input id="exp-label" type="text" placeholder="e.g. July payroll" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-3"/>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Amount (₱)</label>
+    <input id="exp-amount" type="number" min="0" step="0.01" placeholder="e.g. 50000" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-3"/>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Date Incurred</label>
+    <input id="exp-date" type="date" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-4"/>
+    <button onclick="saveExpense()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Save Expense</button>
   </div>
 </div>
 
@@ -727,11 +837,13 @@
       <h4 class="font-bold text-sm text-primary mb-1">Base Ingredients</h4>
       <p class="text-xs text-on-surface-variant mb-3">Always used per unit sold. Quantity is measured at Medium size — Small/Large scale automatically.</p>
       <div id="recipe-items-list" class="space-y-2 mb-3"></div>
-      <div class="flex gap-2">
-        <select id="recipe-new-supply" class="flex-1 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"></select>
-        <input id="recipe-new-qty" type="number" min="0.01" step="0.01" placeholder="Qty" class="w-24 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
+      <div class="flex gap-2 items-center">
+        <select id="recipe-new-supply" onchange="updateRecipeNewUnit()" class="flex-1 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"></select>
+        <input id="recipe-new-qty" type="number" min="0.01" step="0.01" placeholder="Qty" class="w-20 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
+        <span id="recipe-new-unit" class="text-xs text-on-surface-variant w-8">g</span>
         <button onclick="addRecipeItem()" class="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold">Add</button>
       </div>
+      <p class="text-xs text-on-surface-variant mt-1">Unit is set automatically from the supply picked (e.g. a liter-tracked supply is entered in ml).</p>
     </div>
 
     <div class="p-6">
@@ -772,30 +884,17 @@
       <input id="new-addon-label" placeholder="Add-on name, e.g. Extra Espresso Shot" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
       <div class="flex gap-2">
         <input id="new-addon-price" type="number" min="0" step="0.01" placeholder="Price" class="w-24 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
-        <select id="new-addon-supply" class="flex-1 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none">
+        <select id="new-addon-supply" onchange="updateAddonUnit()" class="flex-1 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none">
           <option value="">No ingredient link</option>
         </select>
-        <input id="new-addon-qty" type="number" min="0" step="0.01" placeholder="Qty used" class="w-24 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
+        <input id="new-addon-qty" type="number" min="0" step="0.01" placeholder="Qty used" class="w-20 bg-surface-container rounded-lg px-2 py-2 text-xs border border-outline-variant/30 outline-none"/>
+        <span id="new-addon-unit" class="text-xs text-on-surface-variant w-8"></span>
       </div>
       <div class="flex gap-2">
         <button onclick="addAddon()" id="addon-submit-btn" class="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold">Add Add-on</button>
         <button onclick="cancelEditAddon()" id="addon-cancel-btn" class="px-4 py-2.5 border-2 border-outline-variant rounded-lg text-sm font-semibold" style="display:none">Cancel</button>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- ===== MODAL: RESTOCK ===== -->
-<div class="modal-overlay" id="modal-restock">
-  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="font-bold text-lg text-primary">Restock <span id="restock-product-name"></span></h3>
-      <button onclick="closeModal('modal-restock')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
-    </div>
-    <input type="hidden" id="restock-product-id"/>
-    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Quantity to add</label>
-    <input id="restock-qty" type="number" min="1" step="1" placeholder="e.g. 50" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-4"/>
-    <button onclick="confirmRestock()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Add Stock</button>
   </div>
 </div>
 
@@ -926,7 +1025,7 @@ async function logout() {
 // APP STATE
 // ===================================================================
 let productsCache = [];
-let inventoryCache = {}; // product_id -> { quantity_on_hand, low_stock_threshold }
+let recipeCache = {}; // product_id -> array of { supply_id, quantity_per_base, unit, supplies: {name, unit, quantity_on_hand, low_stock_threshold} }
 let tableOrders = {};
 let activeOrderKey = null;
 let takeoutCounter = 1;
@@ -939,7 +1038,7 @@ let customSelectedValues = {}; // { groupId: optionValueId }
 let customAddonsCache = []; // all active global add-ons
 let payMethod = 'cash';
 let currentReportRange = 'today';
-let currentInventoryTab = 'products';
+let currentReportType = 'general';
 let pendingProductImageFile = null;
 let pendingTableStatusChanges = {}; // { tableId: newStatus }
 
@@ -969,7 +1068,7 @@ function showView(view) {
   if (view === 'tables') renderTables();
   if (view === 'takeout') renderTakeoutOrders();
   if (view === 'order') { renderCategoryBar(); loadProductsAndRenderGrid(); renderTicket(); }
-  if (view === 'inventory') showInventoryView();
+  if (view === 'inventory') loadSupplies();
   if (view === 'products') loadProductsManagement();
   if (view === 'reports') loadReports();
   if (view === 'staff') loadStaffManagement();
@@ -994,17 +1093,55 @@ function showToast(msg, icon='check', isError=false) {
 function fmt(n) { return CURRENCY + Number(n).toFixed(2); }
 
 // ===================================================================
-// DATA LOADING: PRODUCTS + INVENTORY
+// DATA LOADING: PRODUCTS + INGREDIENT STATUS
 // ===================================================================
+function unitFactor(u) {
+  return { ml:1, l:1000, mg:1, g:1000, kg:1000000 }[u] ?? 1;
+}
+function convertQty(qty, fromUnit, toUnit) {
+  return qty * unitFactor(fromUnit) / unitFactor(toUnit);
+}
+
 async function fetchActiveProductsWithStock() {
   const { data: products, error: pErr } = await sb.from('products').select('*').eq('is_active', true).order('category').order('name');
   if (pErr) throw pErr;
-  const { data: inv, error: iErr } = await sb.from('inventory').select('*');
-  if (iErr) throw iErr;
-  inventoryCache = {};
-  inv.forEach(row => { inventoryCache[row.product_id] = row; });
+  const { data: recipes, error: rErr } = await sb.from('recipe_items').select('*, supplies(name,unit,quantity_on_hand,low_stock_threshold)');
+  if (rErr) throw rErr;
+  recipeCache = {};
+  recipes.forEach(r => { (recipeCache[r.product_id] ||= []).push(r); });
   productsCache = products;
   return products;
+}
+
+// Computes how many units of a product can still be made (at Medium size),
+// and whether it's Active / Nearly Out / Out of Ingredients — based purely
+// on whatever's linked in that product's Recipe. No manual stock number.
+function computeStatusFromRecipeItems(items) {
+  if (!items || items.length === 0) return { producible: Infinity, status: 'active' };
+  let producible = Infinity;
+  let nearlyOut = false;
+  for (const item of items) {
+    const supply = item.supplies;
+    if (!supply) continue;
+    const neededInSupplyUnit = convertQty(item.quantity_per_base, item.unit, supply.unit);
+    const count = neededInSupplyUnit > 0 ? Math.floor(supply.quantity_on_hand / neededInSupplyUnit) : Infinity;
+    producible = Math.min(producible, count);
+    if (supply.quantity_on_hand <= supply.low_stock_threshold) nearlyOut = true;
+  }
+  let status = 'active';
+  if (producible <= 0) status = 'out';
+  else if (nearlyOut) status = 'nearly_out';
+  return { producible, status };
+}
+
+function computeProductStatus(productId) {
+  return computeStatusFromRecipeItems(recipeCache[productId]);
+}
+
+function statusBadge(status) {
+  if (status === 'out') return { label: 'Out of Ingredients', cls: 'bg-error text-white' };
+  if (status === 'nearly_out') return { label: 'Nearly Out', cls: 'bg-warning text-white' };
+  return { label: 'Active', cls: 'bg-success/10 text-success' };
 }
 
 async function loadProductsAndRenderGrid() {
@@ -1272,11 +1409,6 @@ function renderCategoryBar() {
 }
 function selectCategory(cat) { currentCategory = cat; renderCategoryBar(); renderProductGrid(); }
 
-function stockFor(productId) {
-  const row = inventoryCache[productId];
-  return row ? row.quantity_on_hand : 0;
-}
-
 function renderProductGrid() {
   const grid = document.getElementById('product-grid');
   const items = productsCache.filter(p => p.category === currentCategory);
@@ -1285,13 +1417,14 @@ function renderProductGrid() {
     return;
   }
   grid.innerHTML = items.map(p => {
-    const stock = stockFor(p.id);
-    const outOfStock = stock <= 0;
+    const { status } = computeProductStatus(p.id);
+    const outOfIngredients = status === 'out';
+    const badge = statusBadge(status);
     return `
-    <button onclick="${outOfStock ? '' : `handleProductTap('${p.id}')`}" ${outOfStock ? 'disabled' : ''} class="product-btn flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/20 text-left shadow-sm hover:shadow-md ${outOfStock ? 'opacity-50 cursor-not-allowed' : ''}">
+    <button onclick="${outOfIngredients ? '' : `handleProductTap('${p.id}')`}" ${outOfIngredients ? 'disabled' : ''} class="product-btn flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/20 text-left shadow-sm hover:shadow-md ${outOfIngredients ? 'opacity-50 cursor-not-allowed' : ''}">
       <div class="h-28 bg-surface-container overflow-hidden relative">
         <img src="${p.image_url || ''}" class="w-full h-full object-cover" alt="${p.name}" onerror="this.style.display='none'"/>
-        ${outOfStock ? `<span class="absolute top-2 right-2 stock-pill bg-error text-white">OUT</span>` : (stock <= (inventoryCache[p.id]?.low_stock_threshold ?? 10) ? `<span class="absolute top-2 right-2 stock-pill bg-warning text-white">LOW</span>` : '')}
+        ${status !== 'active' ? `<span class="absolute top-2 right-2 stock-pill ${badge.cls}">${status === 'out' ? 'OUT' : 'LOW'}</span>` : ''}
       </div>
       <div class="p-3">
         <p class="font-semibold text-sm text-primary leading-snug mb-1">${p.name}</p>
@@ -1305,7 +1438,7 @@ function renderProductGrid() {
 function handleProductTap(id) {
   const p = productsCache.find(x => x.id === id);
   if (!p) return;
-  if (stockFor(id) <= 0) { showToast('Out of stock', 'error', true); return; }
+  if (computeProductStatus(id).status === 'out') { showToast('Out of ingredients', 'error', true); return; }
   if (!activeOrderKey) startTakeoutOrder();
   if (p.has_options) {
     openCustomizeModal(p);
@@ -1403,8 +1536,8 @@ function updateCustomPrice() {
   document.getElementById('cust-total-price').textContent = fmt(calcCustomUnitPrice() * customQty);
 }
 function confirmAddCustomItem() {
-  const stock = stockFor(customizeProduct.id);
-  if (customQty > stock) { showToast(`Only ${stock} left in stock`, 'error', true); return; }
+  const stock = computeProductStatus(customizeProduct.id).producible;
+  if (customQty > stock) { showToast(`Only ${stock} can be made right now`, 'error', true); return; }
   const unit = calcCustomUnitPrice();
   const sizeLabel = SIZE_OPTIONS.find(s => s.id === customSize)?.label.split(' · ')[0] || '';
   const opts = [sizeLabel];
@@ -1440,8 +1573,8 @@ function addItemToTicket(item) {
   const key = item.id + '|' + item.options;
   const existing = ticket.items.find(i => i.key === key);
   const requestedQty = (existing ? existing.qty : 0) + item.qty;
-  const stock = stockFor(item.id);
-  if (requestedQty > stock) { showToast(`Only ${stock} left in stock`, 'error', true); return; }
+  const stock = computeProductStatus(item.id).producible;
+  if (requestedQty > stock) { showToast(`Only ${stock} can be made right now`, 'error', true); return; }
   if (existing) { existing.qty += item.qty; }
   else { ticket.items.push({ key, ...item }); }
   renderTicket();
@@ -1452,7 +1585,7 @@ function changeTicketQty(key, delta) {
   const item = ticket.items.find(i => i.key === key);
   if (!item) return;
   const newQty = item.qty + delta;
-  if (delta > 0 && newQty > stockFor(item.id)) { showToast('Not enough stock', 'error', true); return; }
+  if (delta > 0 && newQty > computeProductStatus(item.id).producible) { showToast('Not enough ingredients in stock', 'error', true); return; }
   item.qty = Math.max(1, newQty);
   renderTicket();
 }
@@ -1618,25 +1751,15 @@ async function completePayment() {
       unit_price: round2(i.unitPrice),
       quantity: i.qty,
       options_label: i.options || null,
-      line_total: round2(i.unitPrice * i.qty)
+      line_total: round2(i.unitPrice * i.qty),
+      size_id: i.sizeId || null
     }));
     const { error: liErr } = await sb.from('transaction_items').insert(lineItems);
     if (liErr) throw liErr;
 
-    // 3. Deduct finished-product stock per item + log each deduction
-    for (const i of ticket.items) {
-      const current = inventoryCache[i.id]?.quantity_on_hand ?? 0;
-      const newQty = Math.max(0, current - i.qty);
-      const { error: invErr } = await sb.from('inventory').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('product_id', i.id);
-      if (invErr) throw invErr;
-      await sb.from('inventory_logs').insert({
-        product_id: i.id, change_qty: -i.qty, reason: 'sale', reference_id: txn.id, performed_by: currentUser.id
-      });
-      if (inventoryCache[i.id]) inventoryCache[i.id].quantity_on_hand = newQty;
-    }
-
-    // 4. Deduct raw-material supplies used by each item's recipe + chosen options/add-ons
-    //    (single atomic database call — scales by size, logs every deduction)
+    // 3. Deduct raw-material supplies used by each item's recipe + chosen options/add-ons
+    //    (single atomic database call — scales by size, logs every deduction).
+    //    Menu items themselves are made to order, so there's no finished-goods stock to touch.
     const supplyPayload = ticket.items.map(i => ({
       product_id: i.id,
       quantity: i.qty,
@@ -1679,33 +1802,8 @@ function closeReceiptAndReset() {
 // ===================================================================
 // INVENTORY VIEW
 // ===================================================================
+// SUPPLIES INVENTORY
 // ===================================================================
-// INVENTORY TABS (Menu Items vs Supplies)
-// ===================================================================
-function showInventoryView() {
-  switchInventoryTab(currentInventoryTab);
-}
-
-function switchInventoryTab(tab) {
-  currentInventoryTab = tab;
-  document.querySelectorAll('.inventory-tab-btn').forEach(b => {
-    b.classList.toggle('bg-primary', b.dataset.tab === tab);
-    b.classList.toggle('text-white', b.dataset.tab === tab);
-  });
-  document.getElementById('inventory-tab-products').style.display = tab === 'products' ? 'block' : 'none';
-  document.getElementById('inventory-tab-supplies').style.display = tab === 'supplies' ? 'block' : 'none';
-  document.getElementById('add-supply-btn').style.display = (tab === 'supplies' && currentUser.role === 'admin') ? 'flex' : 'none';
-  document.getElementById('low-stock-badge').style.display = 'none';
-
-  if (tab === 'products') loadInventory();
-  if (tab === 'supplies') loadSupplies();
-}
-
-function refreshInventoryTab() {
-  if (currentInventoryTab === 'products') loadInventory();
-  else loadSupplies();
-}
-
 async function loadSupplies() {
   document.getElementById('supplies-loading').style.display = 'flex';
   document.getElementById('supplies-table').style.display = 'none';
@@ -1726,6 +1824,14 @@ async function loadSupplies() {
           <td class="py-3 pr-4 font-medium text-primary">${s.name}</td>
           <td class="py-3 pr-4 text-on-surface-variant uppercase text-xs">${s.unit}</td>
           <td class="py-3 pr-4 font-bold">${s.quantity_on_hand}</td>
+          <td class="py-3 pr-4 admin-only ${currentUser.role!=='admin'?'role-hidden':''}">
+            <div class="flex items-center gap-1">
+              <span>${fmt(s.unit_cost)}</span>
+              <button onclick="editSupplyCost('${s.id}', ${s.unit_cost})" class="text-secondary hover:bg-secondary/10 rounded-full p-1">
+                <span class="material-symbols-outlined text-xs">edit</span>
+              </button>
+            </div>
+          </td>
           <td class="py-3 pr-4">${statusHtml}</td>
           <td class="py-3 pr-4">
             <button onclick="openRestockSupplyModal('${s.id}','${s.name.replace(/'/g,"\\'")}','${s.unit}')" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
@@ -1741,10 +1847,8 @@ async function loadSupplies() {
       `;
     }).join('');
 
-    if (currentInventoryTab === 'supplies') {
-      document.getElementById('low-stock-badge').style.display = lowStockCount > 0 ? 'flex' : 'none';
-      document.getElementById('low-stock-count').textContent = lowStockCount;
-    }
+    document.getElementById('low-stock-badge').style.display = lowStockCount > 0 ? 'flex' : 'none';
+    document.getElementById('low-stock-count').textContent = lowStockCount;
   } catch (e) {
     console.error(e);
     showToast('Failed to load supplies', 'error', true);
@@ -1755,11 +1859,28 @@ async function loadSupplies() {
   }
 }
 
+async function editSupplyCost(id, currentCost) {
+  const val = prompt('New cost per unit (₱):', currentCost);
+  if (val === null) return;
+  const num = parseFloat(val);
+  if (isNaN(num) || num < 0) { showToast('Enter a valid cost', 'error', true); return; }
+  try {
+    const { error } = await sb.from('supplies').update({ unit_cost: num }).eq('id', id);
+    if (error) throw error;
+    showToast('Cost updated', 'check');
+    loadSupplies();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to update cost', 'error', true);
+  }
+}
+
 function openSupplyFormModal() {
   document.getElementById('sup-name').value = '';
   document.getElementById('sup-unit').value = 'kg';
   document.getElementById('sup-qty').value = 0;
   document.getElementById('sup-threshold').value = 5;
+  document.getElementById('sup-cost').value = 0;
   document.getElementById('supply-form-error').textContent = '';
   document.getElementById('modal-supply-form').classList.add('open');
 }
@@ -1769,6 +1890,7 @@ async function saveSupplyForm() {
   const unit = document.getElementById('sup-unit').value;
   const qty = parseFloat(document.getElementById('sup-qty').value);
   const threshold = parseFloat(document.getElementById('sup-threshold').value);
+  const cost = parseFloat(document.getElementById('sup-cost').value);
   const errEl = document.getElementById('supply-form-error');
   errEl.textContent = '';
 
@@ -1780,7 +1902,8 @@ async function saveSupplyForm() {
   btn.textContent = 'Saving…';
   try {
     const { error } = await sb.from('supplies').insert({
-      name, unit, quantity_on_hand: qty, low_stock_threshold: isNaN(threshold) ? 5 : threshold
+      name, unit, quantity_on_hand: qty, low_stock_threshold: isNaN(threshold) ? 5 : threshold,
+      unit_cost: isNaN(cost) ? 0 : cost
     });
     if (error) throw error;
     showToast('Supply added', 'check');
@@ -1836,80 +1959,6 @@ async function removeSupply(id, name) {
   }
 }
 
-async function loadInventory() {
-  document.getElementById('inventory-loading').style.display = 'flex';
-  document.getElementById('inventory-table').style.display = 'none';
-  try {
-    const { data: products, error: pErr } = await sb.from('products').select('*').eq('is_active', true).order('category').order('name');
-    if (pErr) throw pErr;
-    const { data: inv, error: iErr } = await sb.from('inventory').select('*');
-    if (iErr) throw iErr;
-    const invMap = {};
-    inv.forEach(row => invMap[row.product_id] = row);
-
-    let lowStockCount = 0;
-    const tbody = document.getElementById('inventory-tbody');
-    tbody.innerHTML = products.map(p => {
-      const row = invMap[p.id] || { quantity_on_hand: 0, low_stock_threshold: 10 };
-      const isLow = row.quantity_on_hand <= row.low_stock_threshold && row.quantity_on_hand > 0;
-      const isOut = row.quantity_on_hand <= 0;
-      if (isLow || isOut) lowStockCount++;
-      let statusHtml = `<span class="stock-pill bg-success/10 text-success">In Stock</span>`;
-      if (isOut) statusHtml = `<span class="stock-pill bg-error/10 text-error">Out of Stock</span>`;
-      else if (isLow) statusHtml = `<span class="stock-pill bg-warning/10 text-warning">Low Stock</span>`;
-      return `
-        <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low/50">
-          <td class="py-3 pr-4 font-medium text-primary">${p.name}</td>
-          <td class="py-3 pr-4 text-on-surface-variant capitalize">${p.category}</td>
-          <td class="py-3 pr-4 font-bold">${row.quantity_on_hand}</td>
-          <td class="py-3 pr-4">${statusHtml}</td>
-          <td class="py-3 pr-4 admin-only ${currentUser.role!=='admin'?'role-hidden':''}">
-            <button onclick="openRestockModal('${p.id}','${p.name.replace(/'/g,"\\'")}')" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm">add_box</span> Restock
-            </button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    document.getElementById('low-stock-badge').style.display = (currentInventoryTab === 'products' && lowStockCount > 0) ? 'flex' : 'none';
-    document.getElementById('low-stock-count').textContent = lowStockCount;
-  } catch (e) {
-    console.error(e);
-    showToast('Failed to load inventory', 'error', true);
-  } finally {
-    document.getElementById('inventory-loading').style.display = 'none';
-    document.getElementById('inventory-table').style.display = 'table';
-    applyRoleVisibility();
-  }
-}
-
-function openRestockModal(productId, productName) {
-  document.getElementById('restock-product-id').value = productId;
-  document.getElementById('restock-product-name').textContent = productName;
-  document.getElementById('restock-qty').value = '';
-  document.getElementById('modal-restock').classList.add('open');
-}
-async function confirmRestock() {
-  const productId = document.getElementById('restock-product-id').value;
-  const qty = parseInt(document.getElementById('restock-qty').value);
-  if (!qty || qty <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
-  try {
-    const { data: row, error: fetchErr } = await sb.from('inventory').select('*').eq('product_id', productId).single();
-    if (fetchErr) throw fetchErr;
-    const newQty = row.quantity_on_hand + qty;
-    const { error: updErr } = await sb.from('inventory').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('product_id', productId);
-    if (updErr) throw updErr;
-    await sb.from('inventory_logs').insert({ product_id: productId, change_qty: qty, reason: 'restock', performed_by: currentUser.id });
-    showToast(`Added ${qty} units`, 'check');
-    closeModal('modal-restock');
-    loadInventory();
-  } catch (e) {
-    console.error(e);
-    showToast('Restock failed', 'error', true);
-  }
-}
-
 // ===================================================================
 // PRODUCT MANAGEMENT VIEW (admin only)
 // ===================================================================
@@ -1919,8 +1968,16 @@ async function loadProductsManagement() {
   try {
     const { data: products, error } = await sb.from('products').select('*').order('category').order('name');
     if (error) throw error;
+    const { data: recipes, error: rErr } = await sb.from('recipe_items').select('*, supplies(name,unit,quantity_on_hand,low_stock_threshold)');
+    if (rErr) throw rErr;
+    const recipesByProduct = {};
+    recipes.forEach(r => { (recipesByProduct[r.product_id] ||= []).push(r); });
+
     const tbody = document.getElementById('products-tbody');
-    tbody.innerHTML = products.map(p => `
+    tbody.innerHTML = products.map(p => {
+      const { status } = computeStatusFromRecipeItems(recipesByProduct[p.id]);
+      const badge = statusBadge(status);
+      return `
       <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low/50">
         <td class="py-2 pr-4"><img src="${p.image_url||''}" class="w-10 h-10 rounded-lg object-cover bg-surface-container" onerror="this.style.opacity=0.2"/></td>
         <td class="py-2 pr-4 font-medium text-primary">${p.name}</td>
@@ -1928,13 +1985,15 @@ async function loadProductsManagement() {
         <td class="py-2 pr-4">${fmt(p.base_price)}</td>
         <td class="py-2 pr-4">${p.has_options ? 'Yes' : 'No'}</td>
         <td class="py-2 pr-4">${p.is_active ? `<span class="stock-pill bg-success/10 text-success">Active</span>` : `<span class="stock-pill bg-outline-variant/20 text-on-surface-variant">Hidden</span>`}</td>
+        <td class="py-2 pr-4"><span class="stock-pill ${badge.cls}">${badge.label}</span></td>
         <td class="py-2 pr-4 text-right">
           <button onclick='openRecipeModal(${JSON.stringify(p).replace(/'/g,"&apos;")})' class="text-primary font-semibold text-xs hover:underline mr-3">Recipe</button>
           <button onclick='openProductFormModal(${JSON.stringify(p).replace(/'/g,"&apos;")})' class="text-secondary font-semibold text-xs hover:underline mr-3">Edit</button>
           <button onclick="openDeleteConfirm('${p.id}','${p.name.replace(/'/g,"\\'")}')" class="text-error font-semibold text-xs hover:underline">Delete</button>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   } catch (e) {
     console.error(e);
     showToast('Failed to load products', 'error', true);
@@ -1953,8 +2012,6 @@ function openProductFormModal(product) {
   document.getElementById('pf-image').value = product ? (product.image_url || '') : '';
   document.getElementById('pf-has-options').checked = product ? product.has_options : false;
   document.getElementById('pf-is-active').checked = product ? product.is_active : true;
-  document.getElementById('pf-stock').value = 0;
-  document.getElementById('pf-stock').parentElement.style.display = product ? 'none' : 'block';
 
   pendingProductImageFile = null;
   document.getElementById('pf-image-file').value = '';
@@ -2004,7 +2061,6 @@ async function saveProductForm() {
   let image_url = document.getElementById('pf-image').value.trim();
   const has_options = document.getElementById('pf-has-options').checked;
   const is_active = document.getElementById('pf-is-active').checked;
-  const startStock = parseInt(document.getElementById('pf-stock').value) || 0;
 
   if (!name) { showToast('Name is required', 'error', true); return; }
   if (isNaN(price) || price < 0) { showToast('Enter a valid price', 'error', true); return; }
@@ -2022,12 +2078,11 @@ async function saveProductForm() {
       if (error) throw error;
       showToast('Product updated', 'check');
     } else {
-      const { data: newProduct, error } = await sb.from('products').insert({
+      const { error } = await sb.from('products').insert({
         name, category, base_price: price, image_url, has_options, is_active
-      }).select().single();
+      });
       if (error) throw error;
-      await sb.from('inventory').insert({ product_id: newProduct.id, quantity_on_hand: startStock, low_stock_threshold: 10 });
-      showToast('Product created', 'check');
+      showToast('Product created — add its ingredients in Recipe', 'check');
     }
     pendingProductImageFile = null;
     closeModal('modal-product-form');
@@ -2082,15 +2137,28 @@ async function openRecipeModal(product) {
   document.getElementById('recipe-new-supply').innerHTML = supplyOptionsHtml;
   document.getElementById('recipe-new-qty').value = '';
   document.getElementById('new-group-name').value = '';
+  updateRecipeNewUnit();
 
   await renderRecipeItems();
   await renderOptionGroups();
   document.getElementById('modal-recipe').classList.add('open');
 }
 
+// A supply tracked in bulk (l/kg) is used in a recipe at fine grain (ml/g);
+// count-based supplies (pcs/bottle/pack) just use themselves — no conversion needed.
+function fineUnitForSupply(bulkUnit) {
+  return { l: 'ml', kg: 'g' }[bulkUnit] ?? bulkUnit;
+}
+
+function updateRecipeNewUnit() {
+  const supplyId = document.getElementById('recipe-new-supply').value;
+  const supply = recipeSuppliesCache.find(s => s.id === supplyId);
+  document.getElementById('recipe-new-unit').textContent = supply ? fineUnitForSupply(supply.unit) : '';
+}
+
 async function renderRecipeItems() {
   const productId = document.getElementById('recipe-product-id').value;
-  const { data, error } = await sb.from('recipe_items').select('*, supplies(name,unit)').eq('product_id', productId).order('created_at');
+  const { data, error } = await sb.from('recipe_items').select('id, quantity_per_base, unit, supplies(name,unit)').eq('product_id', productId).order('created_at');
   if (error) { document.getElementById('recipe-items-list').innerHTML = `<p class="text-xs text-error">Failed to load recipe.</p>`; return; }
   recipeItemsCache = data;
   renderRecipeItemsFromCache();
@@ -2100,7 +2168,7 @@ function renderRecipeItemsFromCache() {
   const list = document.getElementById('recipe-items-list');
   if (!recipeItemsCache.length) { list.innerHTML = `<p class="text-xs text-on-surface-variant">No ingredients added yet.</p>`; return; }
   list.innerHTML = recipeItemsCache.map(r => {
-    const unit = r.supplies?.unit || '';
+    const unit = r.unit || '';
     if (editingRecipeItemId === r.id) {
       return `
         <div class="flex items-center justify-between bg-surface-container rounded-lg px-3 py-2 text-sm gap-2">
@@ -2116,7 +2184,7 @@ function renderRecipeItemsFromCache() {
     }
     return `
       <div class="flex items-center justify-between bg-surface-container rounded-lg px-3 py-2 text-sm">
-        <span>${r.supplies?.name || 'Unknown supply'} — <strong>${r.quantity_per_base}${unit}</strong></span>
+        <span>${r.supplies?.name || 'Unknown supply'} — <strong>${r.quantity_per_base}${unit}</strong> <span class="text-on-surface-variant">(from ${r.supplies?.unit || ''} stock)</span></span>
         <div class="flex items-center gap-1">
           <button onclick="startEditRecipeItem('${r.id}')" class="text-secondary hover:bg-secondary/10 rounded-full p-1">
             <span class="material-symbols-outlined text-sm">edit</span>
@@ -2152,10 +2220,13 @@ async function addRecipeItem() {
   const productId = document.getElementById('recipe-product-id').value;
   const supplyId = document.getElementById('recipe-new-supply').value;
   const qty = parseFloat(document.getElementById('recipe-new-qty').value);
-  if (!supplyId) { showToast('Pick a supply', 'error', true); return; }
+  const supply = recipeSuppliesCache.find(s => s.id === supplyId);
+  if (!supplyId || !supply) { showToast('Pick a supply', 'error', true); return; }
   if (isNaN(qty) || qty <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
   try {
-    const { error } = await sb.from('recipe_items').insert({ product_id: productId, supply_id: supplyId, quantity_per_base: qty });
+    const { error } = await sb.from('recipe_items').insert({
+      product_id: productId, supply_id: supplyId, quantity_per_base: qty, unit: fineUnitForSupply(supply.unit)
+    });
     if (error) throw error;
     document.getElementById('recipe-new-qty').value = '';
     await renderRecipeItems();
@@ -2190,7 +2261,7 @@ async function renderOptionGroups() {
     const values = (g.option_values || []).sort((a,b)=>a.sort_order-b.sort_order);
     const valuesHtml = values.map(v => {
       const linkedSupply = recipeSuppliesCache.find(s => s.id === v.supply_id);
-      const linkText = linkedSupply ? ` → ${linkedSupply.name} (${v.quantity_per_base || 0}${linkedSupply.unit})` : '';
+      const linkText = linkedSupply ? ` → ${linkedSupply.name} (${v.quantity_per_base || 0}${v.unit || fineUnitForSupply(linkedSupply.unit)}, from ${linkedSupply.unit} stock)` : '';
       const priceText = v.price_delta ? ` (+${fmt(v.price_delta)})` : '';
       return `
         <div class="flex items-center justify-between bg-surface-container-lowest rounded-lg px-2 py-1.5 text-xs">
@@ -2259,12 +2330,14 @@ async function addOptionValue(groupId) {
   const priceDelta = parseFloat(document.getElementById(`nvp-${groupId}`).value) || 0;
   const supplyId = document.getElementById(`nvs-${groupId}`).value || null;
   const qty = parseFloat(document.getElementById(`nvq-${groupId}`).value);
+  const supply = recipeSuppliesCache.find(s => s.id === supplyId);
   if (!label) { showToast('Enter a choice label', 'error', true); return; }
   try {
     const { error } = await sb.from('option_values').insert({
       group_id: groupId, label, price_delta: priceDelta,
       supply_id: supplyId || null,
-      quantity_per_base: supplyId && !isNaN(qty) ? qty : null
+      quantity_per_base: supplyId && !isNaN(qty) ? qty : null,
+      unit: supply && !isNaN(qty) ? fineUnitForSupply(supply.unit) : null
     });
     if (error) throw error;
     await renderOptionGroups();
@@ -2368,6 +2441,12 @@ async function openManageAddonsModal() {
   document.getElementById('modal-manage-addons').classList.add('open');
 }
 
+function updateAddonUnit() {
+  const supplyId = document.getElementById('new-addon-supply').value;
+  const supply = recipeSuppliesCache.find(s => s.id === supplyId);
+  document.getElementById('new-addon-unit').textContent = supply ? fineUnitForSupply(supply.unit) : '';
+}
+
 async function renderAddonsList() {
   const { data, error } = await sb.from('addons').select('*').order('label');
   const list = document.getElementById('addons-list');
@@ -2376,7 +2455,7 @@ async function renderAddonsList() {
   if (!data.length) { list.innerHTML = `<p class="text-sm text-on-surface-variant">No add-ons yet.</p>`; return; }
   list.innerHTML = data.map(a => {
     const linkedSupply = recipeSuppliesCache.find(s => s.id === a.supply_id);
-    const linkText = linkedSupply ? ` → ${linkedSupply.name} (${a.quantity_per_unit || 0}${linkedSupply.unit})` : '';
+    const linkText = linkedSupply ? ` → ${linkedSupply.name} (${a.quantity_per_unit || 0}${a.unit || fineUnitForSupply(linkedSupply.unit)}, from ${linkedSupply.unit} stock)` : '';
     return `
       <div class="flex items-center justify-between p-3 bg-surface-container rounded-xl">
         <span class="text-sm"><strong>${a.label}</strong> (+${fmt(a.price)})${linkText}</span>
@@ -2399,6 +2478,7 @@ function startEditAddon(a) {
   document.getElementById('new-addon-price').value = a.price;
   document.getElementById('new-addon-supply').value = a.supply_id || '';
   document.getElementById('new-addon-qty').value = a.quantity_per_unit ?? '';
+  updateAddonUnit();
   document.getElementById('addon-submit-btn').textContent = 'Save Changes';
   document.getElementById('addon-cancel-btn').style.display = 'block';
 }
@@ -2409,6 +2489,7 @@ function cancelEditAddon() {
   document.getElementById('new-addon-price').value = '';
   document.getElementById('new-addon-supply').value = '';
   document.getElementById('new-addon-qty').value = '';
+  updateAddonUnit();
   document.getElementById('addon-submit-btn').textContent = 'Add Add-on';
   document.getElementById('addon-cancel-btn').style.display = 'none';
 }
@@ -2418,10 +2499,12 @@ async function addAddon() {
   const price = parseFloat(document.getElementById('new-addon-price').value) || 0;
   const supplyId = document.getElementById('new-addon-supply').value || null;
   const qty = parseFloat(document.getElementById('new-addon-qty').value);
+  const supply = recipeSuppliesCache.find(s => s.id === supplyId);
   if (!label) { showToast('Enter an add-on name', 'error', true); return; }
   const payload = {
     label, price, supply_id: supplyId || null,
-    quantity_per_unit: supplyId && !isNaN(qty) ? qty : null
+    quantity_per_unit: supplyId && !isNaN(qty) ? qty : null,
+    unit: supply && !isNaN(qty) ? fineUnitForSupply(supply.unit) : null
   };
   try {
     const { error } = editingAddonId
@@ -2550,6 +2633,17 @@ function setReportRange(range) {
   loadReports();
 }
 
+function setReportType(type) {
+  currentReportType = type;
+  document.querySelectorAll('.report-type-btn').forEach(b => {
+    b.classList.toggle('bg-primary', b.dataset.type === type);
+    b.classList.toggle('text-white', b.dataset.type === type);
+  });
+  document.getElementById('report-tab-general').style.display = type === 'general' ? 'block' : 'none';
+  document.getElementById('report-tab-income').style.display = type === 'income' ? 'block' : 'none';
+  document.getElementById('report-tab-inventory').style.display = type === 'inventory' ? 'block' : 'none';
+}
+
 function rangeStartDate(range) {
   const d = new Date();
   if (range === 'today') { d.setHours(0,0,0,0); return d; }
@@ -2636,13 +2730,245 @@ async function loadReports() {
       `;
     }).join('') : `<tr><td colspan="6" class="py-6 text-center text-sm text-on-surface-variant">No transactions in this period.</td></tr>`;
 
+    // =========================================================
+    // INCOME REPORT
+    // =========================================================
+    const netSales = txns.reduce((s,t) => s + (Number(t.subtotal) - Number(t.discount_amount)), 0);
+    const vat = txns.reduce((s,t) => s + Number(t.tax_amount), 0);
+    const totalSalesInclVat = gross;
+
+    document.getElementById('inc-net-sales').textContent = fmt(netSales);
+    document.getElementById('inc-vat').textContent = fmt(vat);
+    document.getElementById('inc-total-sales').textContent = fmt(totalSalesInclVat);
+
+    // Cost of Sales — ingredient usage this period, valued at current unit cost
+    let usageQuery = sb.from('supply_logs').select('*, supplies(unit_cost)').eq('reason', 'usage');
+    if (start) usageQuery = usageQuery.gte('created_at', start.toISOString());
+    const { data: usageLogs, error: uErr } = await usageQuery;
+    if (uErr) throw uErr;
+    const cogs = usageLogs.reduce((s,l) => s + (Math.abs(Number(l.change_qty)) * Number(l.supplies?.unit_cost || 0)), 0);
+
+    // Current inventory valuation (snapshot, not date-ranged)
+    const { data: allSupplies, error: sErr } = await sb.from('supplies').select('*');
+    if (sErr) throw sErr;
+    const inventoryValue = allSupplies.reduce((s,sup) => s + (Number(sup.quantity_on_hand) * Number(sup.unit_cost)), 0);
+
+    document.getElementById('inc-cogs').textContent = fmt(cogs);
+    document.getElementById('inc-inventory-value').textContent = fmt(inventoryValue);
+
+    // Payment breakdown (Income tab copy)
+    document.getElementById('inc-payment-breakdown').innerHTML = document.getElementById('rep-payment-breakdown').innerHTML;
+
+    // Operating expenses
+    let expQuery = sb.from('operating_expenses').select('*');
+    if (start) expQuery = expQuery.gte('incurred_on', start.toISOString().slice(0,10));
+    const { data: expenses, error: eErr } = await expQuery;
+    if (eErr) throw eErr;
+    const expenseTotals = { manpower: 0, maintenance: 0, infrastructure: 0, other: 0 };
+    expenses.forEach(e => { expenseTotals[e.category] = (expenseTotals[e.category] || 0) + Number(e.amount); });
+    const totalOpex = Object.values(expenseTotals).reduce((a,b) => a+b, 0);
+    const expLabels = { manpower: 'Manpower', maintenance: 'Maintenance', infrastructure: 'Infrastructure', other: 'Other' };
+    document.getElementById('inc-expenses-breakdown').innerHTML = totalOpex > 0 || expenses.length ? Object.entries(expenseTotals).map(([cat,total]) => `
+      <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium">${expLabels[cat]}</span><span class="text-on-surface-variant font-semibold">${fmt(total)}</span></div>
+    `).join('') : `<p class="text-sm text-on-surface-variant">No expenses logged in this period.</p>`;
+
+    // Profit summary + margin
+    const netProfit = netSales - cogs - totalOpex;
+    const margin = netSales > 0 ? (netProfit / netSales) * 100 : 0;
+    document.getElementById('inc-summary-sales').textContent = fmt(netSales);
+    document.getElementById('inc-summary-cogs').textContent = '−' + fmt(cogs);
+    document.getElementById('inc-summary-opex').textContent = '−' + fmt(totalOpex);
+    document.getElementById('inc-summary-profit').textContent = fmt(netProfit);
+
+    const marginCard = document.getElementById('inc-margin-card');
+    const marginEl = document.getElementById('inc-margin');
+    const marginNote = document.getElementById('inc-margin-note');
+    marginEl.textContent = margin.toFixed(1) + '%';
+    marginCard.classList.remove('border-error','bg-error/5','border-success','bg-success/5','border-secondary','bg-secondary/5');
+    marginEl.classList.remove('text-error','text-success','text-secondary');
+    if (margin < 35) {
+      marginCard.classList.add('border-error','bg-error/5'); marginEl.classList.add('text-error');
+      marginNote.textContent = 'Below target (35–50%)';
+    } else if (margin <= 50) {
+      marginCard.classList.add('border-success','bg-success/5'); marginEl.classList.add('text-success');
+      marginNote.textContent = 'Within target (35–50%)';
+    } else {
+      marginCard.classList.add('border-secondary','bg-secondary/5'); marginEl.classList.add('text-secondary');
+      marginNote.textContent = 'Above target range';
+    }
+
+    // =========================================================
+    // INVENTORY REPORT
+    // =========================================================
+    const { data: sizes, error: szErr } = await sb.from('sizes').select('*').order('sort_order');
+    if (szErr) throw szErr;
+    const sizeTotals = {};
+    sizes.forEach(sz => sizeTotals[sz.id] = { label: sz.label, qty: 0 });
+    items.forEach(i => {
+      const key = i.size_id && sizeTotals[i.size_id] ? i.size_id : null;
+      if (key) sizeTotals[key].qty += i.quantity;
+    });
+    document.getElementById('inv-size-breakdown').innerHTML = Object.values(sizeTotals).map(s => `
+      <div class="bg-surface-container rounded-xl p-4 text-center">
+        <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-1">${s.label}</p>
+        <p class="text-2xl font-bold text-primary">${s.qty}</p>
+        <p class="text-xs text-on-surface-variant">units sold</p>
+      </div>
+    `).join('');
+
+    // Top items (Inventory tab copy)
+    document.getElementById('inv-top-items').innerHTML = document.getElementById('rep-top-items').innerHTML;
+
+    // Supplies usage report
+    let restockQuery = sb.from('supply_logs').select('supply_id, change_qty').eq('reason', 'restock');
+    if (start) restockQuery = restockQuery.gte('created_at', start.toISOString());
+    const { data: restockLogs, error: rlErr } = await restockQuery;
+    if (rlErr) throw rlErr;
+
+    const usedBySupply = {};
+    usageLogs.forEach(l => { usedBySupply[l.supply_id] = (usedBySupply[l.supply_id] || 0) + Math.abs(Number(l.change_qty)); });
+    const restockedBySupply = {};
+    restockLogs.forEach(l => { restockedBySupply[l.supply_id] = (restockedBySupply[l.supply_id] || 0) + Number(l.change_qty); });
+
+    const suppliesWithActivity = allSupplies.filter(s => usedBySupply[s.id] || restockedBySupply[s.id]);
+    document.getElementById('inv-supplies-usage').innerHTML = suppliesWithActivity.length ? suppliesWithActivity.map(s => {
+      const used = usedBySupply[s.id] || 0;
+      const restocked = restockedBySupply[s.id] || 0;
+      const cost = used * Number(s.unit_cost);
+      return `
+        <tr class="border-b border-outline-variant/10">
+          <td class="py-2 pr-4 font-medium text-primary">${s.name}</td>
+          <td class="py-2 pr-4 text-right">${used.toFixed(2)} ${s.unit}</td>
+          <td class="py-2 pr-4 text-right">${restocked.toFixed(2)} ${s.unit}</td>
+          <td class="py-2 pr-4 text-right">${fmt(cost)}</td>
+          <td class="py-2 pr-4 text-right font-semibold">${Number(s.quantity_on_hand).toFixed(2)} ${s.unit}</td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="5" class="py-6 text-center text-sm text-on-surface-variant">No supply activity in this period.</td></tr>`;
+
   } catch (e) {
     console.error(e);
     showToast('Failed to load reports', 'error', true);
   } finally {
     document.getElementById('reports-loading').style.display = 'none';
     document.getElementById('reports-content').style.display = 'block';
+    setReportType(currentReportType);
   }
+}
+
+// ===================================================================
+// OPERATING EXPENSES (admin only)
+// ===================================================================
+function openAddExpenseModal() {
+  document.getElementById('exp-category').value = 'manpower';
+  document.getElementById('exp-label').value = '';
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('modal-add-expense').classList.add('open');
+}
+
+async function saveExpense() {
+  const category = document.getElementById('exp-category').value;
+  const label = document.getElementById('exp-label').value.trim();
+  const amount = parseFloat(document.getElementById('exp-amount').value);
+  const incurredOn = document.getElementById('exp-date').value;
+  if (!label) { showToast('Enter a description', 'error', true); return; }
+  if (isNaN(amount) || amount < 0) { showToast('Enter a valid amount', 'error', true); return; }
+  try {
+    const { error } = await sb.from('operating_expenses').insert({
+      category, label, amount, incurred_on: incurredOn || new Date().toISOString().slice(0,10), created_by: currentUser.id
+    });
+    if (error) throw error;
+    showToast('Expense logged', 'check');
+    closeModal('modal-add-expense');
+    loadReports();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to save expense', 'error', true);
+  }
+}
+
+// ===================================================================
+// PDF EXPORT
+// ===================================================================
+function exportReportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const rangeLabel = { today: 'Today', week: 'Last 7 Days', all: 'All Time' }[currentReportRange];
+  const typeLabel = { general: 'General', income: 'Income', inventory: 'Inventory' }[currentReportType];
+
+  doc.setFontSize(16);
+  doc.text('Kinglaine Coffee & Brew', 14, 16);
+  doc.setFontSize(11);
+  doc.text(`${typeLabel} Report — ${rangeLabel}`, 14, 24);
+  doc.setFontSize(9);
+  doc.setTextColor(120);
+  doc.text(`Generated ${new Date().toLocaleString()}`, 14, 30);
+  doc.setTextColor(0);
+
+  let y = 40;
+
+  if (currentReportType === 'general') {
+    doc.autoTable({
+      startY: y,
+      head: [['Metric', 'Value']],
+      body: [
+        ['Gross Sales', document.getElementById('rep-gross').textContent],
+        ['Transactions', document.getElementById('rep-orders').textContent],
+        ['Avg. Ticket', document.getElementById('rep-avg').textContent],
+        ['Items Sold', document.getElementById('rep-items').textContent],
+      ]
+    });
+    y = doc.lastAutoTable.finalY + 10;
+    const txnRows = Array.from(document.querySelectorAll('#rep-transaction-log tr')).map(tr =>
+      Array.from(tr.children).map(td => td.textContent.trim())
+    );
+    doc.text('Transaction Log', 14, y);
+    doc.autoTable({ startY: y + 4, head: [['Receipt #','Date/Time','Type','Items','Method','Total']], body: txnRows });
+  }
+
+  if (currentReportType === 'income') {
+    doc.autoTable({
+      startY: y,
+      head: [['Metric', 'Value']],
+      body: [
+        ['Net Sales', document.getElementById('inc-net-sales').textContent],
+        ['VAT Collected (12%)', document.getElementById('inc-vat').textContent],
+        ['Total Sales (incl. VAT)', document.getElementById('inc-total-sales').textContent],
+        ['Cost of Sales', document.getElementById('inc-cogs').textContent],
+        ['Current Inventory Value', document.getElementById('inc-inventory-value').textContent],
+        ['Profit Margin', document.getElementById('inc-margin').textContent + ' (' + document.getElementById('inc-margin-note').textContent + ')'],
+      ]
+    });
+    y = doc.lastAutoTable.finalY + 10;
+    doc.autoTable({
+      startY: y,
+      head: [['Profit Summary', 'Amount']],
+      body: [
+        ['Net Sales', document.getElementById('inc-summary-sales').textContent],
+        ['− Cost of Sales', document.getElementById('inc-summary-cogs').textContent],
+        ['− Operating Expenses', document.getElementById('inc-summary-opex').textContent],
+        ['Net Profit', document.getElementById('inc-summary-profit').textContent],
+      ]
+    });
+  }
+
+  if (currentReportType === 'inventory') {
+    const sizeRows = Array.from(document.querySelectorAll('#inv-size-breakdown > div')).map(card => {
+      const label = card.querySelector('p:first-child').textContent;
+      const qty = card.querySelector('p:nth-child(2)').textContent;
+      return [label, qty];
+    });
+    doc.autoTable({ startY: y, head: [['Size', 'Units Sold']], body: sizeRows });
+    y = doc.lastAutoTable.finalY + 10;
+    const supplyRows = Array.from(document.querySelectorAll('#inv-supplies-usage tr')).map(tr =>
+      Array.from(tr.children).map(td => td.textContent.trim())
+    );
+    doc.text('Supplies Usage', 14, y);
+    doc.autoTable({ startY: y + 4, head: [['Supply','Used','Restocked','Cost','Current Level']], body: supplyRows });
+  }
+
+  doc.save(`kinglaine-${typeLabel.toLowerCase()}-report-${currentReportRange}.pdf`);
 }
 
 // ===================================================================
