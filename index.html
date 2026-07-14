@@ -238,7 +238,10 @@
         <div class="flex items-center gap-2 text-sm bg-error-container text-on-error-container px-3 py-1.5 rounded-full" id="low-stock-badge" style="display:none">
           <span class="material-symbols-outlined text-base">warning</span> <span id="low-stock-count">0</span> low stock
         </div>
-        <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+        <button onclick="openBulkResupplyModal()" class="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">local_shipping</span> Bulk Resupply
+        </button>
+        <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">add</span> Add Supply
         </button>
         <button onclick="loadSupplies()" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
@@ -254,7 +257,6 @@
             <th class="py-3 pr-4">Supply</th>
             <th class="py-3 pr-4">Unit</th>
             <th class="py-3 pr-4">On Hand</th>
-            <th class="py-3 pr-4">Cost/Unit</th>
             <th class="py-3 pr-4">Status</th>
             <th class="py-3 pr-4">Restock</th>
             <th class="py-3 pr-4 admin-only text-right">Remove</th>
@@ -293,7 +295,6 @@
             <th class="py-3 pr-4">Name</th>
             <th class="py-3 pr-4">Category</th>
             <th class="py-3 pr-4">Price</th>
-            <th class="py-3 pr-4">Has Options</th>
             <th class="py-3 pr-4">Visible</th>
             <th class="py-3 pr-4">Stock Status</th>
             <th class="py-3 pr-4 text-right">Actions</th>
@@ -653,6 +654,24 @@
       <div>
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Base Price (₱)</label>
         <input id="pf-price" type="number" min="0" step="0.01" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+        <p class="text-xs text-on-surface-variant mt-1">Used when no size-specific price below is set.</p>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Size Pricing (₱) — optional, overrides Base Price per size</label>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Small</label>
+            <input id="pf-price-small" type="number" min="0" step="0.01" placeholder="e.g. 95" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
+          </div>
+          <div>
+            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Medium</label>
+            <input id="pf-price-medium" type="number" min="0" step="0.01" placeholder="e.g. 110" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
+          </div>
+          <div>
+            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Large</label>
+            <input id="pf-price-large" type="number" min="0" step="0.01" placeholder="e.g. 125" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
+          </div>
+        </div>
       </div>
       <div>
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Product Image</label>
@@ -671,10 +690,6 @@
       <div class="bg-surface-container rounded-lg px-3 py-2 text-xs text-on-surface-variant">
         Stock is no longer set manually — availability is calculated automatically from the ingredients linked in <strong>Recipe</strong> (after saving).
       </div>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input id="pf-has-options" type="checkbox" class="w-4 h-4 accent-secondary"/>
-        <span class="text-sm font-medium">Has size/milk/add-on options</span>
-      </label>
       <label class="flex items-center gap-2 cursor-pointer">
         <input id="pf-is-active" type="checkbox" checked class="w-4 h-4 accent-secondary"/>
         <span class="text-sm font-medium">Active (visible in POS)</span>
@@ -774,10 +789,6 @@
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Low Stock Threshold</label>
         <input id="sup-threshold" type="number" min="0" step="0.01" value="5" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
       </div>
-      <div>
-        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Cost per Unit (₱)</label>
-        <input id="sup-cost" type="number" min="0" step="0.01" value="0" placeholder="e.g. cost per liter or per kg" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
-      </div>
       <p id="supply-form-error" class="text-error text-xs font-semibold h-4"></p>
     </div>
     <div class="p-6 border-t border-outline-variant/20">
@@ -821,6 +832,30 @@
     <label class="text-xs font-semibold text-on-surface-variant block mb-1">Quantity to add (<span id="restock-supply-unit"></span>)</label>
     <input id="restock-supply-qty" type="number" min="0.01" step="0.01" placeholder="e.g. 10" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-4"/>
     <button onclick="confirmRestockSupply()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Add Stock</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: BULK RESUPPLY ===== -->
+<div class="modal-overlay" id="modal-bulk-resupply">
+  <div class="bg-surface-container-lowest rounded-2xl w-[640px] max-h-[85vh] flex flex-col shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center flex-shrink-0">
+      <div>
+        <h3 class="font-bold text-xl text-primary">Bulk Resupply</h3>
+        <p class="text-xs text-on-surface-variant mt-0.5">Enter how much came in for each item, then save once.</p>
+      </div>
+      <button onclick="closeModal('modal-bulk-resupply')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-4 border-b border-outline-variant/20 flex-shrink-0">
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+        <input id="bulk-resupply-search" type="text" placeholder="Search supplies…" oninput="renderBulkResupplyList(this.value)" class="w-full bg-surface-container rounded-lg pl-10 pr-3 py-2.5 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto custom-scrollbar px-4" id="bulk-resupply-list"></div>
+    <div class="p-6 border-t border-outline-variant/20 flex-shrink-0 flex items-center justify-between gap-4">
+      <p class="text-sm text-on-surface-variant"><span id="bulk-resupply-count">0</span> item(s) will be updated</p>
+      <button onclick="saveBulkResupply()" id="bulk-resupply-save-btn" class="px-6 py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Save Resupply</button>
+    </div>
   </div>
 </div>
 
@@ -1034,6 +1069,7 @@ let customizeProduct = null;
 let customQty = 1;
 let customSize = 'medium';
 let customOptionGroups = []; // option groups (with values) for the product currently being customized
+let customSizePrices = {}; // { size_id: price } per-product size price overrides, if configured
 let customSelectedValues = {}; // { groupId: optionValueId }
 let customAddonsCache = []; // all active global add-ons
 let payMethod = 'cash';
@@ -1440,12 +1476,7 @@ function handleProductTap(id) {
   if (!p) return;
   if (computeProductStatus(id).status === 'out') { showToast('Out of ingredients', 'error', true); return; }
   if (!activeOrderKey) startTakeoutOrder();
-  if (p.has_options) {
-    openCustomizeModal(p);
-  } else {
-    addItemToTicket({ id: p.id, name: p.name, unitPrice: p.base_price, qty: 1, options: '', img: p.image_url, sizeId: 'medium', optionValueIds: [], addonIds: [] });
-    showToast(p.name + ' added', 'check');
-  }
+  openCustomizeModal(p);
 }
 
 // ===================================================================
@@ -1462,9 +1493,19 @@ async function openCustomizeModal(p) {
   document.getElementById('cust-qty').textContent = '1';
   document.getElementById('cust-note').value = '';
 
-  document.getElementById('cust-size-options').innerHTML = SIZE_OPTIONS.map(s => `
-    <button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id==='medium'?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all">${s.label}</button>
-  `).join('');
+  // Load this product's per-size price overrides, if any (falls back to
+  // base_price + the global size delta when a size isn't overridden)
+  const { data: sizePrices } = await sb.from('product_sizes').select('size_id, price').eq('product_id', p.id);
+  customSizePrices = {};
+  (sizePrices || []).forEach(sp => { customSizePrices[sp.size_id] = Number(sp.price); });
+
+  document.getElementById('cust-size-options').innerHTML = SIZE_OPTIONS.map(s => {
+    const override = customSizePrices[s.id];
+    const priceHint = override !== undefined ? fmt(override) : fmt(p.base_price + s.add);
+    return `<button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id==='medium'?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all flex flex-col items-center gap-0.5">
+      <span>${s.label}</span><span class="text-[10px] opacity-70">${priceHint}</span>
+    </button>`;
+  }).join('');
 
   // Load this product's option groups (e.g. Milk Type) fresh from the database
   const { data: groups, error: gErr } = await sb.from('option_groups').select('*, option_values(*)').eq('product_id', p.id).order('sort_order');
@@ -1517,7 +1558,14 @@ function custQtyChange(d) {
   updateCustomPrice();
 }
 function calcCustomUnitPrice() {
-  const sizeAdd = SIZE_OPTIONS.find(s => s.id === customSize)?.add || 0;
+  const override = customSizePrices[customSize];
+  let sizedBase;
+  if (override !== undefined) {
+    sizedBase = override;
+  } else {
+    const sizeAdd = SIZE_OPTIONS.find(s => s.id === customSize)?.add || 0;
+    sizedBase = customizeProduct.base_price + sizeAdd;
+  }
   let optionTotal = 0;
   customOptionGroups.forEach(g => {
     const selectedId = customSelectedValues[g.id];
@@ -1529,7 +1577,7 @@ function calcCustomUnitPrice() {
     const a = customAddonsCache.find(x => x.id === cb.dataset.addon);
     if (a) addonTotal += a.price;
   });
-  return customizeProduct.base_price + sizeAdd + optionTotal + addonTotal;
+  return sizedBase + optionTotal + addonTotal;
 }
 function updateCustomPrice() {
   if (!customizeProduct) return;
@@ -1824,14 +1872,6 @@ async function loadSupplies() {
           <td class="py-3 pr-4 font-medium text-primary">${s.name}</td>
           <td class="py-3 pr-4 text-on-surface-variant uppercase text-xs">${s.unit}</td>
           <td class="py-3 pr-4 font-bold">${s.quantity_on_hand}</td>
-          <td class="py-3 pr-4 admin-only ${currentUser.role!=='admin'?'role-hidden':''}">
-            <div class="flex items-center gap-1">
-              <span>${fmt(s.unit_cost)}</span>
-              <button onclick="editSupplyCost('${s.id}', ${s.unit_cost})" class="text-secondary hover:bg-secondary/10 rounded-full p-1">
-                <span class="material-symbols-outlined text-xs">edit</span>
-              </button>
-            </div>
-          </td>
           <td class="py-3 pr-4">${statusHtml}</td>
           <td class="py-3 pr-4">
             <button onclick="openRestockSupplyModal('${s.id}','${s.name.replace(/'/g,"\\'")}','${s.unit}')" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
@@ -1859,28 +1899,12 @@ async function loadSupplies() {
   }
 }
 
-async function editSupplyCost(id, currentCost) {
-  const val = prompt('New cost per unit (₱):', currentCost);
-  if (val === null) return;
-  const num = parseFloat(val);
-  if (isNaN(num) || num < 0) { showToast('Enter a valid cost', 'error', true); return; }
-  try {
-    const { error } = await sb.from('supplies').update({ unit_cost: num }).eq('id', id);
-    if (error) throw error;
-    showToast('Cost updated', 'check');
-    loadSupplies();
-  } catch (e) {
-    console.error(e);
-    showToast('Failed to update cost', 'error', true);
-  }
-}
 
 function openSupplyFormModal() {
   document.getElementById('sup-name').value = '';
   document.getElementById('sup-unit').value = 'kg';
   document.getElementById('sup-qty').value = 0;
   document.getElementById('sup-threshold').value = 5;
-  document.getElementById('sup-cost').value = 0;
   document.getElementById('supply-form-error').textContent = '';
   document.getElementById('modal-supply-form').classList.add('open');
 }
@@ -1890,7 +1914,6 @@ async function saveSupplyForm() {
   const unit = document.getElementById('sup-unit').value;
   const qty = parseFloat(document.getElementById('sup-qty').value);
   const threshold = parseFloat(document.getElementById('sup-threshold').value);
-  const cost = parseFloat(document.getElementById('sup-cost').value);
   const errEl = document.getElementById('supply-form-error');
   errEl.textContent = '';
 
@@ -1902,8 +1925,7 @@ async function saveSupplyForm() {
   btn.textContent = 'Saving…';
   try {
     const { error } = await sb.from('supplies').insert({
-      name, unit, quantity_on_hand: qty, low_stock_threshold: isNaN(threshold) ? 5 : threshold,
-      unit_cost: isNaN(cost) ? 0 : cost
+      name, unit, quantity_on_hand: qty, low_stock_threshold: isNaN(threshold) ? 5 : threshold
     });
     if (error) throw error;
     showToast('Supply added', 'check');
@@ -1946,6 +1968,92 @@ async function confirmRestockSupply() {
   }
 }
 
+// ===================================================================
+// BULK RESUPPLY (restock many supplies at once, e.g. a delivery/shipment)
+// ===================================================================
+let bulkResupplyCache = [];
+let bulkResupplyEntries = {}; // { supplyId: quantityString } — survives search filtering
+
+async function openBulkResupplyModal() {
+  try {
+    const { data, error } = await sb.from('supplies').select('id,name,unit,quantity_on_hand').order('name');
+    if (error) throw error;
+    bulkResupplyCache = data;
+    bulkResupplyEntries = {};
+    document.getElementById('bulk-resupply-search').value = '';
+    renderBulkResupplyList('');
+    document.getElementById('modal-bulk-resupply').classList.add('open');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load supplies', 'error', true);
+  }
+}
+
+function renderBulkResupplyList(filter) {
+  const q = (filter || '').trim().toLowerCase();
+  const list = document.getElementById('bulk-resupply-list');
+  const filtered = bulkResupplyCache.filter(s => s.name.toLowerCase().includes(q));
+
+  if (!filtered.length) {
+    list.innerHTML = `<p class="text-sm text-on-surface-variant py-8 text-center">No supplies match "${filter}".</p>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(s => `
+    <div class="flex items-center justify-between py-2.5 border-b border-outline-variant/10">
+      <div class="flex-1 min-w-0">
+        <p class="font-medium text-sm text-primary truncate">${s.name}</p>
+        <p class="text-xs text-on-surface-variant">On hand: ${Number(s.quantity_on_hand).toFixed(2)} ${s.unit}</p>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <input type="number" min="0" step="0.01" placeholder="0"
+          value="${bulkResupplyEntries[s.id] || ''}"
+          oninput="updateBulkResupplyEntry('${s.id}', this.value)"
+          class="w-24 bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none text-right"/>
+        <span class="text-xs text-on-surface-variant w-10">${s.unit}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateBulkResupplyEntry(supplyId, value) {
+  if (value === '' || parseFloat(value) <= 0 || isNaN(parseFloat(value))) {
+    delete bulkResupplyEntries[supplyId];
+  } else {
+    bulkResupplyEntries[supplyId] = value;
+  }
+  document.getElementById('bulk-resupply-count').textContent = Object.keys(bulkResupplyEntries).length;
+}
+
+async function saveBulkResupply() {
+  const entries = Object.entries(bulkResupplyEntries).filter(([,v]) => parseFloat(v) > 0);
+  if (entries.length === 0) { showToast('Enter at least one quantity', 'error', true); return; }
+
+  const btn = document.getElementById('bulk-resupply-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await Promise.all(entries.map(async ([supplyId, valueStr]) => {
+      const qty = parseFloat(valueStr);
+      const supply = bulkResupplyCache.find(s => s.id === supplyId);
+      const newQty = Number(supply.quantity_on_hand) + qty;
+      const { error: updErr } = await sb.from('supplies').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('id', supplyId);
+      if (updErr) throw updErr;
+      await sb.from('supply_logs').insert({ supply_id: supplyId, change_qty: qty, reason: 'restock', performed_by: currentUser.id });
+    }));
+    showToast(`Resupplied ${entries.length} item${entries.length!==1?'s':''}`, 'check');
+    bulkResupplyEntries = {};
+    closeModal('modal-bulk-resupply');
+    loadSupplies();
+  } catch (e) {
+    console.error(e);
+    showToast('Some items failed to update — check and try again', 'error', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Resupply';
+  }
+}
+
 async function removeSupply(id, name) {
   if (!confirm(`Remove ${name}? This cannot be undone.`)) return;
   try {
@@ -1973,17 +2081,26 @@ async function loadProductsManagement() {
     const recipesByProduct = {};
     recipes.forEach(r => { (recipesByProduct[r.product_id] ||= []).push(r); });
 
+    const { data: sizePrices, error: spErr } = await sb.from('product_sizes').select('product_id, size_id, price');
+    if (spErr) throw spErr;
+    const sizePricesByProduct = {};
+    sizePrices.forEach(sp => { (sizePricesByProduct[sp.product_id] ||= {})[sp.size_id] = sp.price; });
+    const sizeAbbrev = { small: 'S', medium: 'M', large: 'L' };
+
     const tbody = document.getElementById('products-tbody');
     tbody.innerHTML = products.map(p => {
       const { status } = computeStatusFromRecipeItems(recipesByProduct[p.id]);
       const badge = statusBadge(status);
+      const overrides = sizePricesByProduct[p.id];
+      const priceDisplay = overrides
+        ? Object.entries(overrides).map(([sz,pr]) => `${sizeAbbrev[sz]||sz} ${fmt(pr)}`).join(' / ')
+        : fmt(p.base_price);
       return `
       <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low/50">
         <td class="py-2 pr-4"><img src="${p.image_url||''}" class="w-10 h-10 rounded-lg object-cover bg-surface-container" onerror="this.style.opacity=0.2"/></td>
         <td class="py-2 pr-4 font-medium text-primary">${p.name}</td>
         <td class="py-2 pr-4 capitalize text-on-surface-variant">${p.category}</td>
-        <td class="py-2 pr-4">${fmt(p.base_price)}</td>
-        <td class="py-2 pr-4">${p.has_options ? 'Yes' : 'No'}</td>
+        <td class="py-2 pr-4 text-xs">${priceDisplay}</td>
         <td class="py-2 pr-4">${p.is_active ? `<span class="stock-pill bg-success/10 text-success">Active</span>` : `<span class="stock-pill bg-outline-variant/20 text-on-surface-variant">Hidden</span>`}</td>
         <td class="py-2 pr-4"><span class="stock-pill ${badge.cls}">${badge.label}</span></td>
         <td class="py-2 pr-4 text-right">
@@ -2003,15 +2120,25 @@ async function loadProductsManagement() {
   }
 }
 
-function openProductFormModal(product) {
+async function openProductFormModal(product) {
   document.getElementById('product-form-title').textContent = product ? 'Edit Product' : 'New Product';
   document.getElementById('pf-id').value = product ? product.id : '';
   document.getElementById('pf-name').value = product ? product.name : '';
   document.getElementById('pf-category').value = product ? product.category : 'coffee';
   document.getElementById('pf-price').value = product ? product.base_price : '';
   document.getElementById('pf-image').value = product ? (product.image_url || '') : '';
-  document.getElementById('pf-has-options').checked = product ? product.has_options : false;
   document.getElementById('pf-is-active').checked = product ? product.is_active : true;
+  document.getElementById('pf-price-small').value = '';
+  document.getElementById('pf-price-medium').value = '';
+  document.getElementById('pf-price-large').value = '';
+
+  if (product) {
+    const { data: sizePrices } = await sb.from('product_sizes').select('size_id, price').eq('product_id', product.id);
+    (sizePrices || []).forEach(sp => {
+      const el = document.getElementById(`pf-price-${sp.size_id}`);
+      if (el) el.value = sp.price;
+    });
+  }
 
   pendingProductImageFile = null;
   document.getElementById('pf-image-file').value = '';
@@ -2059,8 +2186,12 @@ async function saveProductForm() {
   const category = document.getElementById('pf-category').value;
   const price = parseFloat(document.getElementById('pf-price').value);
   let image_url = document.getElementById('pf-image').value.trim();
-  const has_options = document.getElementById('pf-has-options').checked;
   const is_active = document.getElementById('pf-is-active').checked;
+  const sizePriceInputs = {
+    small: document.getElementById('pf-price-small').value,
+    medium: document.getElementById('pf-price-medium').value,
+    large: document.getElementById('pf-price-large').value
+  };
 
   if (!name) { showToast('Name is required', 'error', true); return; }
   if (isNaN(price) || price < 0) { showToast('Enter a valid price', 'error', true); return; }
@@ -2071,19 +2202,35 @@ async function saveProductForm() {
       image_url = await uploadProductImage(pendingProductImageFile);
     }
 
+    let productId = id;
     if (id) {
       const { error } = await sb.from('products').update({
-        name, category, base_price: price, image_url, has_options, is_active, updated_at: new Date().toISOString()
+        name, category, base_price: price, image_url, is_active, updated_at: new Date().toISOString()
       }).eq('id', id);
       if (error) throw error;
       showToast('Product updated', 'check');
     } else {
-      const { error } = await sb.from('products').insert({
-        name, category, base_price: price, image_url, has_options, is_active
-      });
+      const { data: newProduct, error } = await sb.from('products').insert({
+        name, category, base_price: price, image_url, is_active
+      }).select().single();
       if (error) throw error;
+      productId = newProduct.id;
       showToast('Product created — add its ingredients in Recipe', 'check');
     }
+
+    // Save per-size price overrides: a filled field upserts a price, an
+    // emptied field removes the override (falling back to Base Price + global delta)
+    for (const [sizeId, val] of Object.entries(sizePriceInputs)) {
+      if (val === '') {
+        await sb.from('product_sizes').delete().eq('product_id', productId).eq('size_id', sizeId);
+      } else {
+        await sb.from('product_sizes').upsert(
+          { product_id: productId, size_id: sizeId, price: parseFloat(val) },
+          { onConflict: 'product_id,size_id' }
+        );
+      }
+    }
+
     pendingProductImageFile = null;
     closeModal('modal-product-form');
     loadProductsManagement();
