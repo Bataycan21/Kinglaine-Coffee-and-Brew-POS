@@ -1186,8 +1186,14 @@ let currentShiftId = null;   // open shift_logs row id for the current non-admin
 let autoLogoutTime = null;   // 'HH:MM:SS' string from app_settings, or null if disabled
 let autoLogoutTimer = null;  // setInterval handle that checks the cutoff
 
+// Staff log in with just a username + PIN — there's no real email involved.
+// Supabase Auth requires an email-shaped identifier internally, so we
+// synthesize one from the username. Supabase's validator checks against
+// real top-level domains, so a made-up suffix like ".pos" or ".local"
+// gets rejected — ".com" is a real TLD, so this passes even though the
+// domain itself is never actually used to send mail.
 function usernameToEmail(username) {
-  return `${username.trim().toLowerCase()}@kinglaine.pos`;
+  return `${username.trim().toLowerCase()}@kinglaine-pos.com`;
 }
 
 async function attemptLogin() {
@@ -2268,6 +2274,30 @@ async function saveSupplyForm() {
   }
 }
 
+// ---------------------------------------------------------------
+// Shared supply-stock helpers — used by Restock, Bulk Resupply, and
+// Log Waste, which previously each duplicated this fetch/update/log logic.
+// ---------------------------------------------------------------
+
+// Fetch a list of supplies. `columns` lets callers ask for just what they need.
+async function fetchSupplies(columns = '*') {
+  const { data, error } = await sb.from('supplies').select(columns).order('name');
+  if (error) throw error;
+  return data;
+}
+
+// Applies `delta` (positive = restock, negative = usage/waste) to a supply's
+// quantity_on_hand and records the change in supply_logs. Returns the new qty.
+async function adjustSupplyQuantity(supplyId, currentQty, delta, reason, notes = null) {
+  const newQty = Number(currentQty) + delta;
+  const { error: updErr } = await sb.from('supplies')
+    .update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() })
+    .eq('id', supplyId);
+  if (updErr) throw updErr;
+  await sb.from('supply_logs').insert({ supply_id: supplyId, change_qty: delta, reason, performed_by: currentUser.id, notes });
+  return newQty;
+}
+
 function openRestockSupplyModal(supplyId, supplyName, unit) {
   document.getElementById('restock-supply-id').value = supplyId;
   document.getElementById('restock-supply-name').textContent = supplyName;
@@ -2283,10 +2313,7 @@ async function confirmRestockSupply() {
   try {
     const { data: row, error: fetchErr } = await sb.from('supplies').select('*').eq('id', supplyId).single();
     if (fetchErr) throw fetchErr;
-    const newQty = row.quantity_on_hand + qty;
-    const { error: updErr } = await sb.from('supplies').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('id', supplyId);
-    if (updErr) throw updErr;
-    await sb.from('supply_logs').insert({ supply_id: supplyId, change_qty: qty, reason: 'restock', performed_by: currentUser.id });
+    await adjustSupplyQuantity(supplyId, row.quantity_on_hand, qty, 'restock');
     showToast(`Added ${qty} ${row.unit}`, 'check');
     closeModal('modal-restock-supply');
     loadSupplies();
@@ -2304,8 +2331,7 @@ let bulkResupplyEntries = {}; // { supplyId: quantityString } — survives searc
 
 async function openBulkResupplyModal() {
   try {
-    const { data, error } = await sb.from('supplies').select('id,name,unit,quantity_on_hand').order('name');
-    if (error) throw error;
+    const data = await fetchSupplies('id,name,unit,quantity_on_hand');
     bulkResupplyCache = data;
     bulkResupplyEntries = {};
     document.getElementById('bulk-resupply-search').value = '';
@@ -2361,13 +2387,10 @@ async function saveBulkResupply() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
   try {
-    await Promise.all(entries.map(async ([supplyId, valueStr]) => {
+    await Promise.all(entries.map(([supplyId, valueStr]) => {
       const qty = parseFloat(valueStr);
       const supply = bulkResupplyCache.find(s => s.id === supplyId);
-      const newQty = Number(supply.quantity_on_hand) + qty;
-      const { error: updErr } = await sb.from('supplies').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('id', supplyId);
-      if (updErr) throw updErr;
-      await sb.from('supply_logs').insert({ supply_id: supplyId, change_qty: qty, reason: 'restock', performed_by: currentUser.id });
+      return adjustSupplyQuantity(supplyId, supply.quantity_on_hand, qty, 'restock');
     }));
     showToast(`Resupplied ${entries.length} item${entries.length!==1?'s':''}`, 'check');
     bulkResupplyEntries = {};
@@ -2389,8 +2412,7 @@ let wasteSuppliesCache = [];
 
 async function openLogWasteModal() {
   try {
-    const { data, error } = await sb.from('supplies').select('id,name,unit,quantity_on_hand').order('name');
-    if (error) throw error;
+    const data = await fetchSupplies('id,name,unit,quantity_on_hand');
     wasteSuppliesCache = data;
     document.getElementById('waste-supply-select').innerHTML = data.map(s => `<option value="${s.id}">${s.name} (${Number(s.quantity_on_hand).toFixed(2)} ${s.unit} on hand)</option>`).join('');
     document.getElementById('waste-qty').value = '';
@@ -2417,10 +2439,7 @@ async function saveWasteLog() {
   if (isNaN(qty) || qty <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
   if (qty > Number(supply.quantity_on_hand)) { showToast(`Only ${supply.quantity_on_hand} ${supply.unit} on hand`, 'error', true); return; }
   try {
-    const newQty = Number(supply.quantity_on_hand) - qty;
-    const { error: updErr } = await sb.from('supplies').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('id', supplyId);
-    if (updErr) throw updErr;
-    await sb.from('supply_logs').insert({ supply_id: supplyId, change_qty: -qty, reason: 'waste', performed_by: currentUser.id, notes: notes || null });
+    await adjustSupplyQuantity(supplyId, supply.quantity_on_hand, -qty, 'waste', notes || null);
     showToast('Waste logged', 'check');
     closeModal('modal-log-waste');
     loadSupplies();

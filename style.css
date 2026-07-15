@@ -1,6 +1,19 @@
 /* =============================================
-   KINGLAINE COFFEE & BREW — style.css
+   KINGLAINE COFFEE & BREW — style.css (refactored)
+   Same visual result as before. Colors that were repeated
+   as raw hex throughout the file are now named variables.
    ============================================= */
+
+:root {
+  --color-surface: #fefae0;
+  --color-primary: #7d562d;
+  --color-primary-dark: #7a532a;
+  --color-accent-soft: rgba(255, 202, 152, 0.3);
+  --color-accent-soft-light: rgba(255, 202, 152, 0.2);
+  --color-scrollbar-thumb: #d3c3bd;
+  --color-shadow: rgba(37, 22, 14, 0.12);
+  --color-overlay: rgba(37, 22, 14, 0.3);
+}
 
 /* Google Fonts are loaded via <link> in index.html */
 
@@ -58,11 +71,11 @@
   height: 100vh;
   width: 400px;
   max-width: 95vw;
-  background: #fefae0;
+  background: var(--color-surface);
   z-index: 1000;
   transform: translateX(100%);
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: -8px 0 40px rgba(37, 22, 14, 0.12);
+  box-shadow: -8px 0 40px var(--color-shadow);
   overflow-y: auto;
 }
 .cart-drawer.open { transform: translateX(0); }
@@ -71,7 +84,7 @@
 .cart-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(37, 22, 14, 0.3);
+  background: var(--color-overlay);
   z-index: 999;
   opacity: 0;
   pointer-events: none;
@@ -87,7 +100,7 @@
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: #fefae0;
+  background: var(--color-surface);
   transform: translateY(-100%);
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -102,28 +115,28 @@
 
 /* ----- Custom scrollbar (cart drawer, product panel) ----- */
 .custom-scrollbar::-webkit-scrollbar       { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #d3c3bd; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-scrollbar-thumb); border-radius: 10px; }
 
 /* ----- Size selector button states ----- */
-.size-btn.selected                 { border-color: #7d562d; background: rgba(255, 202, 152, 0.3); }
-.size-btn.selected .size-icon      { color: #7d562d; }
+.size-btn.selected            { border-color: var(--color-primary); background: var(--color-accent-soft); }
+.size-btn.selected .size-icon { color: var(--color-primary); }
 
 /* ----- Milk option button states ----- */
-.milk-btn.selected { border-color: #7d562d; background: rgba(255, 202, 152, 0.2); color: #7a532a; }
+.milk-btn.selected { border-color: var(--color-primary); background: var(--color-accent-soft-light); color: var(--color-primary-dark); }
 
 /* ----- Checkbox accent ----- */
-input[type="checkbox"]:checked { accent-color: #7d562d; }
+input[type="checkbox"]:checked { accent-color: var(--color-primary); }
 
 /* ----- Active navigation link ----- */
 .nav-link.active {
-  color: #7d562d;
+  color: var(--color-primary);
   font-weight: 700;
-  border-bottom: 2px solid #7d562d;
+  border-bottom: 2px solid var(--color-primary);
   padding-bottom: 4px;
 }
 
 /* ----- Category sidebar button (selected state) ----- */
-.category-btn.selected { background-color: #ffca98; color: #7a532a; }
+.category-btn.selected { background-color: #ffca98; color: var(--color-primary-dark); }
 
 /* ----- Filled star icon ----- */
 .star-filled {

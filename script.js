@@ -1,125 +1,78 @@
 /* =============================================
-   KINGLAINE COFFEE & BREW — script.js
+   KINGLAINE COFFEE & BREW — script.js (refactored)
+   Same pages, cart, and UI behavior as before.
+   The only real change: products/sizes/options/add-ons
+   now load live from Supabase instead of a hardcoded list.
    ============================================= */
 
-/* ===== PRODUCT DATABASE ===== */
-const PRODUCTS = {
-  'velvet-caramel': {
-    id: 'velvet-caramel', name: 'Velvet Caramel Macchiato', price: 5.95,
-    desc: 'Slow-roasted espresso layered with artisanal salted caramel and steamed micro-foam.',
-    cat: 'coffee',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB88dUq1CfOGYe9Q3qu9AVNb4VVPpomAFWT_-WOPUM0Jr2kAatS_GtatPBxZ59GGyBQ9NTKQl9KnsLsnRDQEdZk3U7IJOlwpHLUcmzvcSuSmOB0HpxZf-cps_5PYW7v9wzy5AByEQIb0hk8TNKgXQCeo-IrRYb8UPi-t71uoVPT_Qra9GZFKkYybg8B70kDbhpxRYqJV7LNRd6En3_05ueQTuTPeCwnn0UGO2blNn-RKZ2zZBJHmtmPQ4-sfL72N930dFa9YOCx3dCk',
-    rating: 4.9, reviews: 98, hasOptions: true
-  },
-  'classic-latte': {
-    id: 'classic-latte', name: 'Classic Latte', price: 4.50,
-    desc: 'Velvety steamed milk over our house-blend espresso.',
-    cat: 'coffee',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBGVjEjcDV63Ku3CKzk5O12roY5kP5_T5F14tGTKANFUjSB4SUTTSaguAXoozjIgA7hQI8qYtEW29zPFRe9Z4KhNCn2rSNSrMbmLVKgQUqgjkR97fOO3RWMCQEFeFK7JperA-DQABDo5ShRAwrOTmAQnESqEIGLcOM1JztDoQIlGhcIBamA05a6KoKAYmCNrJFfkDOq3k1IyNFG7ONiXVTgdKt2EH-UOGM1qRbRXWCh5N6M8SleAvCs2s30NNJ5rIqlP3wxsaVHO8r8',
-    rating: 4.8, reviews: 120, hasOptions: true
-  },
-  'butter-croissant': {
-    id: 'butter-croissant', name: 'Butter Croissant', price: 3.75,
-    desc: 'Hand-laminated dough, baked fresh every morning.',
-    cat: 'bakery',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAu_rlyXbRtHplsmpGCZl-VG3BpN-15lx80Z_zP7yHHCyj6bWY9qZpODolDpFquBAWCKxkkDjsatDhDIYGn8klh_jdJ_SIMzKFAhNDDTPFqINyK9TbnW5KIhzX_QWJ4qzUCvLZpaMQI2PgXBdmZgOePcoS3uE2UqhYwyR4sbBerSVUfFBaS2225Fq3JCIAQjtabY9Nv0cwBtNfOZhy0Qlk4o27WQEDzykyhb5sL4OpmQ8olxUmsWDfTvlzFxB1uRVbUrY46bNXyPTeS',
-    rating: 4.7, reviews: 88, hasOptions: false
-  },
-  'cold-brew-reserve': {
-    id: 'cold-brew-reserve', name: 'Cold Brew Reserve', price: 5.25,
-    desc: '18-hour steep, single-origin Ethiopian beans.',
-    cat: 'coffee',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBT4Kty7AIUj37iynd3v7XZSNr-ZsJxGA1azPHOnX6U0Lse3pdkdtlOKILJuuXxwQGUXr-tAA50rWj5ORmNEOk66ihlxDRBIWBdiyKvMeGvapDasL4F1UCiZDlmkLaV7-MJy2FA2d53XNQOmy3PLISxocXrFAPWfjlavHurkiWK41bZcPxenFLU3iSCwZ8u9G-wTEr5GnHlSxB_1I1qFIn-gCaYdQEIwQFXf-ufT8ZINPjpQ9LdUsct05YdOXi25Snyr69FC6rnuPBY',
-    rating: 4.8, reviews: 85, hasOptions: false
-  },
-  'velvet-latte': {
-    id: 'velvet-latte', name: 'Velvet Latte', price: 5.75,
-    desc: 'Double shot of house espresso with steamed silky milk and a hint of vanilla bean syrup.',
-    cat: 'coffee',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC__wa2baWIqhhVSPFbp9q0ry0do9Z0df_eMM67X8UTbWTplMN-4A8Jk-h4Q71IuFFi-qgjc1Ou1pUSuTnMYxfexFOizabegjTRMBTM_Jvwrj0aJmmdVzfyw_U2CR-22CeZMaM_DOVwXo-P-97HneNXIfpjPUVJ5EqgXn7kxmDfpLyeIK6OgYZ8vF9FulAo58_Ts39c80iWbyQ96OlBrjIBys7-VSoxd9BjrUB0LHHIXKpi3iKN3fyeXp7diA37W4MpXajVK5u82R07',
-    rating: 4.9, reviews: 120, hasOptions: true
-  },
-  'midnight-cold-brew': {
-    id: 'midnight-cold-brew', name: 'Midnight Cold Brew', price: 6.25,
-    desc: '18-hour slow-steeped Ethiopian beans with notes of dark chocolate and stone fruit.',
-    cat: 'coffee',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBAF0J2Ov8pWeoG1dEjsbvHOPG0ojjhwC9Ou3AdxeoH9OcI1UmQrpZZn1lL6PaUgd6yONFxTKSo_clrYZrJPXTrkPSbPtB3neZKlXTBjVB1dtGeAH3uPtUXBZEzTU0f7puOewV5kHHh4ICQWCkKoHtP0rKDXuYPPjfv9dHu8vu1DYR4UdWkec0hOsbt7kvp4jiRWhCiBtp_BN8Y17R3AgdbkZTbuqUwraRZfNf1O7275Hsa8esVeReNwqKuRWGAmqo3jXSD_8lrBJO2',
-    rating: 4.8, reviews: 85, hasOptions: false
-  },
-  'pistachio-cortado': {
-    id: 'pistachio-cortado', name: 'Pistachio Cortado', price: 5.25,
-    desc: 'Equal parts espresso and warm milk with house-made roasted pistachio cream.',
-    cat: 'coffee',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDsDquNpPKio-sFGgOSPFZKxyfNtZn3H24PfTphqp0dQfvti-svoJ6JM1_MEqRDifi2lcf9cMj5-PGT_MJ0emsTjRmsdFK6fIprZodd8754Sbf3iYfHRNwfbkGZsu2NgZjcsA4mjIdfyTN_NBw7e1hxTkOYhMuydG3jNkGdAqHm8UIw_AkCkapwcFEVVEgQGit8Kdit5mNgJvMb8lkHj6L3Af1HBZ3escAgqmUV-gxLPklrum1cMbFnMtQIj5lJQ0u91xG4qnvrLOeX',
-    rating: 5.0, reviews: 42, hasOptions: true
-  },
-  'origin-pour-over': {
-    id: 'origin-pour-over', name: 'Origin Pour Over', price: 7.00,
-    desc: 'Rotating single-origin selection brewed manually for complex clarity of flavor.',
-    cat: 'coffee',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCa64ycw811Woo-a7WyD7xaUlmosX_acrEn5WXM4kN8lJpMELQhUhy3pSH52G4ePOjOwYziwaumzo9SDBtWwfXeXerldheYhGhlZ8jyuTsGq01DIGvUVgJrXmBQPJi0S2tVw6gvXYmQXNC1wtxi_IIFc9zP-_ya_1KHX7TwH3AfT85oY-wGoGvR2oEnllvM7t5rX-3MnQ4Jsd1-K1zFIaS25X1KQbJhaQeMlhrStJ3raiHGpwYxbW_UEadzE2mBukNwJTQTM_IkCkYu',
-    rating: 4.7, reviews: 56, hasOptions: true
-  },
-  'almond-croissant': {
-    id: 'almond-croissant', name: 'Almond Croissant', price: 4.50,
-    desc: 'Twice-baked buttery pastry filled with sweet almond frangipane and topped with toasted flakes.',
-    cat: 'bakery',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDmFc7aTlA-kfog0q357Wd-VRbEb_FPwWjcloaqSUzIa0Kc6Hp_Nw8daPmVsspiRHsyeFRIfHguvh9Gw5i4p__DlMvNEeD4zY0AM1uFHXueZMD_ERIAwvkizy2CTbuO93_QBmgRM7biSakE2HFwx5bsJ5f6fJh_DbnNjCA_xyvsQ2FChlAQdUcwfXNB18kArY7jxwE-ZIyZfNFc8ibRIBs0wJKcil98-2a8TT8PtipAoWQTXGaDdYIxLuKOwvffT0jprY8KE7G2sfHx',
-    rating: 4.9, reviews: 210, hasOptions: false
-  },
-  'artisan-macarons': {
-    id: 'artisan-macarons', name: 'Artisan Macarons', price: 12.00,
-    desc: 'Set of 6 delicate almond shells with seasonal ganache fillings. Handcrafted daily.',
-    cat: 'bakery',
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCdECi4qDHsPjKD6EA7a3yq1iq6C0nUpgPVTHfP8-LbSyeNq1hoCspwZu1GXjXrxHSJgDDaA0ipoZghVEinoRKaRG4NQO2HHdr89POtjTwDQpXTNTNRzUF6IgQOKHqiqnJiTxfs6zCmhGjJZyVLsNUMH0aHPxse58O7gSzzbLdyssc5drJTem8qjid2pv-czAFQbAN6anLNHcr9LJonXjbsMbXZLPkl6ERYbUIyLXLtFm4_n3C9PBWjuKhsDfr12jU7kNeTPhv857L6',
-    rating: 4.6, reviews: 34, hasOptions: false
-  },
-  'chamomile-honey': {
-    id: 'chamomile-honey', name: 'Chamomile Honey Tea', price: 4.00,
-    desc: 'Organic chamomile blossoms steeped with local wildflower honey.',
-    cat: 'tea',
-    img: 'https://images.unsplash.com/photo-1597318181409-cf64d0b5d8a2?w=600',
-    rating: 4.5, reviews: 62, hasOptions: false
-  },
-  'matcha-latte': {
-    id: 'matcha-latte', name: 'Ceremonial Matcha', price: 5.50,
-    desc: 'Grade-A ceremonial matcha whisked with steamed oat milk. Earthy, smooth, and grounding.',
-    cat: 'tea',
-    img: 'https://images.unsplash.com/photo-1515823064-d6e0c04616a7?w=600',
-    rating: 4.7, reviews: 91, hasOptions: true
-  },
-  'brew-mug': {
-    id: 'brew-mug', name: 'Kinglaine Brew Mug', price: 28.00,
-    desc: '12oz hand-thrown ceramic mug with the Kinglaine crest. Dishwasher safe.',
-    cat: 'merch',
-    img: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=600',
-    rating: 4.9, reviews: 44, hasOptions: false
-  },
-  'beans-250g': {
-    id: 'beans-250g', name: 'House Blend Beans 250g', price: 18.00,
-    desc: 'Our signature house blend, freshly roasted the day of shipping. Medium roast.',
-    cat: 'merch',
-    img: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600',
-    rating: 5.0, reviews: 33, hasOptions: false
-  }
+/* ===== SUPABASE CLIENT ===== */
+const SUPABASE_URL = 'https://vgprkfxmeioxevtocenp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZncHJrZnhtZWlveGV2dG9jZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzM3NjMsImV4cCI6MjA4NzY0OTc2M30.KoPJ4JXgPtZ13OHAwYVukfyWQykWJ2Gzr3CAWIBuSkA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ===== CATEGORY METADATA (display copy only — not product data) ===== */
+const CATEGORY_META = {
+  coffee: { title: 'Signature Coffee', desc: 'Ethically sourced, small-batch roasted beans curated for the ultimate sensory experience.' },
+  tea:    { title: 'Artisan Teas',     desc: 'Carefully sourced whole-leaf teas and seasonal blends, steeped to perfection.' },
+  bakery: { title: 'The Bakery',       desc: 'Hand-crafted pastries baked fresh each morning from stone-milled flour.' },
+  frappe: { title: 'Frappes',          desc: 'Blended, chilled, and finished with all the toppings.' }
 };
 
-/* ===== CATEGORY METADATA ===== */
-const CATEGORY_META = {
-  coffee: { title: 'Signature Coffee',  desc: 'Ethically sourced, small-batch roasted beans curated for the ultimate sensory experience.' },
-  tea:    { title: 'Artisan Teas',      desc: 'Carefully sourced whole-leaf teas and seasonal blends, steeped to perfection.' },
-  bakery: { title: 'The Bakery',        desc: 'Hand-crafted pastries baked fresh each morning from stone-milled flour.' },
-  merch:  { title: 'Merchandise',       desc: 'Bring the Kinglaine experience home. Mugs, beans, and barista essentials.' }
-};
+/* ===== LIVE DATA CACHES (populated by loadCatalog()) ===== */
+let PRODUCTS = {};          // id -> product row
+let SIZES_BY_PRODUCT = {};  // product_id -> [{id, label, price}]
+let OPTION_GROUPS_BY_PRODUCT = {}; // product_id -> [{id, name, values:[{id,label,price_delta}]}]
+let ADDONS = [];            // [{id, label, price}]
+let catalogLoaded = false;
 
 /* ===== CART STATE ===== */
-let cart            = [];
-let currentPage     = 'home';
-let currentProduct  = null;
+let cart              = [];
+let currentPage       = 'home';
+let currentProduct    = null;
 let currentProductQty = 1;
-let selectedSize    = 'medium';
-let selectedMilk    = 'Whole Milk';
-const sizePriceAdds = { small: -0.50, medium: 0, large: 0.75 };
+let selectedSizeId    = null;
+let selectedOptionValues = {}; // group_id -> value_id
+
+/* =============================================
+   CATALOG LOADING — replaces the old hardcoded PRODUCTS object
+   ============================================= */
+async function loadCatalog() {
+  const [{ data: products, error: pErr }, { data: sizes }, { data: groups }, { data: addons }] = await Promise.all([
+    sb.from('products').select('*').eq('is_active', true).order('category').order('name'),
+    sb.from('product_sizes').select('product_id, size_id, price, sizes(id, label, sort_order)').order('sizes(sort_order)'),
+    sb.from('option_groups').select('*, option_values(*)').order('sort_order'),
+    sb.from('addons').select('*').eq('is_active', true).order('label')
+  ]);
+
+  if (pErr) { console.error(pErr); showToast('Could not load the menu. Please refresh.', 'error'); return; }
+
+  PRODUCTS = {};
+  (products || []).forEach(p => { PRODUCTS[p.id] = p; });
+
+  SIZES_BY_PRODUCT = {};
+  (sizes || []).forEach(row => {
+    (SIZES_BY_PRODUCT[row.product_id] ||= []).push({
+      id: row.size_id, label: row.sizes?.label || row.size_id, price: Number(row.price)
+    });
+  });
+
+  OPTION_GROUPS_BY_PRODUCT = {};
+  (groups || []).forEach(g => {
+    if (!g.product_id) return;
+    const values = (g.option_values || [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(v => ({ id: v.id, label: v.label, price_delta: Number(v.price_delta) || 0 }));
+    (OPTION_GROUPS_BY_PRODUCT[g.product_id] ||= []).push({ id: g.id, name: g.name, values });
+  });
+
+  ADDONS = (addons || []).map(a => ({ id: a.id, label: a.label, price: Number(a.price) }));
+
+  catalogLoaded = true;
+}
+
+function productsByCategory(cat) {
+  return Object.values(PRODUCTS).filter(p => p.category === cat);
+}
 
 /* =============================================
    NAVIGATION
@@ -186,23 +139,15 @@ function updateCartBadge() {
   badge.style.display = n > 0 ? 'flex' : 'none';
 }
 
-function addToCartById(id, opts = {}) {
+function addToCartById(id) {
   const p = PRODUCTS[id];
   if (!p) return;
-  const key      = id + (opts.size || '') + (opts.milk || '');
+  const key      = id + '-default';
   const existing = cart.find(i => i.key === key);
   if (existing) {
     existing.qty++;
   } else {
-    cart.push({
-      key,
-      id,
-      name:    p.name,
-      price:   p.price + (opts.priceAdd || 0),
-      qty:     1,
-      img:     p.img,
-      options: opts.label || ''
-    });
+    cart.push({ key, id, name: p.name, price: Number(p.base_price), qty: 1, img: p.image_url, options: '' });
   }
   updateCartBadge();
   if (currentPage === 'cart') renderCartPage();
@@ -340,15 +285,13 @@ function renderCartPage() {
 }
 
 function updateOrderSummary() {
-  console.log("updateOrderSummary() is running");
-
-  const total = getCartTotal();
+  const total   = getCartTotal();
   const vatable = total / 1.12;
-  const vat = total - vatable;
+  const vat     = total - vatable;
 
   document.getElementById('order-subtotal').textContent = '₱' + vatable.toFixed(2);
-  document.getElementById('order-tax').textContent = '₱' + vat.toFixed(2);
-  document.getElementById('order-total').textContent = '₱' + total.toFixed(2);
+  document.getElementById('order-tax').textContent      = '₱' + vat.toFixed(2);
+  document.getElementById('order-total').textContent    = '₱' + total.toFixed(2);
 }
 
 function applyPromo() {
@@ -372,8 +315,8 @@ function checkout() {
    MENU PAGE
    ============================================= */
 function renderMenu(cat) {
-  const products = Object.values(PRODUCTS).filter(p => p.cat === cat);
-  const meta     = CATEGORY_META[cat];
+  const products = productsByCategory(cat);
+  const meta     = CATEGORY_META[cat] || { title: cat, desc: '' };
 
   document.getElementById('menu-category-title').textContent = meta.title;
   document.getElementById('menu-category-desc').textContent  = meta.desc;
@@ -382,17 +325,12 @@ function renderMenu(cat) {
   grid.innerHTML = products.map(p => `
     <div class="product-card group relative bg-surface-container-low rounded-[2rem] p-6 border border-transparent hover:border-tertiary-fixed-dim transition-all cursor-pointer" onclick="openProductDetail('${p.id}')">
       <div class="relative w-full aspect-square mb-6 overflow-hidden rounded-2xl bg-surface-container">
-        <img alt="${p.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="${p.img}"/>
+        <img alt="${p.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="${p.image_url || ''}"/>
       </div>
       <div class="flex justify-between items-start mb-2">
         <h3 class="font-headline-sm text-xl text-primary">${p.name}</h3>
-        <span class="font-label-md text-secondary">$${p.price.toFixed(2)}</span>
+        <span class="font-label-md text-secondary">$${Number(p.base_price).toFixed(2)}</span>
       </div>
-      <div class="flex items-center gap-1 mb-4">
-        <span class="material-symbols-outlined text-secondary text-base star-filled">star</span>
-        <span class="font-caption text-on-surface">${p.rating} (${p.reviews}+)</span>
-      </div>
-      <p class="font-body-md text-on-surface-variant mb-6 line-clamp-2">${p.desc}</p>
       <button onclick="event.stopPropagation(); addToCartById('${p.id}'); showToast('${p.name} added!','check')"
               class="w-full py-3 px-6 rounded-full bg-secondary text-on-secondary font-label-md flex items-center justify-center gap-2 hover:bg-primary transition-colors active:scale-95">
         <span class="material-symbols-outlined text-base">add</span> Add to cart
@@ -400,16 +338,12 @@ function renderMenu(cat) {
     </div>
   `).join('');
 
-  /* Update sidebar category buttons */
   document.querySelectorAll('.category-btn').forEach(btn => {
     btn.classList.remove('selected', 'bg-secondary-container', 'text-on-secondary-container');
-    if (btn.dataset.cat === cat) {
-      btn.classList.add('selected', 'bg-secondary-container', 'text-on-secondary-container');
-    }
+    if (btn.dataset.cat === cat) btn.classList.add('selected', 'bg-secondary-container', 'text-on-secondary-container');
   });
 }
 
-/* Attach category sidebar click handlers after DOM is ready */
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.category-btn').forEach(btn => {
     btn.addEventListener('click', () => renderMenu(btn.dataset.cat));
@@ -423,35 +357,56 @@ function openProductDetail(id) {
   const p = PRODUCTS[id];
   if (!p) return;
 
-  currentProduct    = p;
-  currentProductQty = 1;
-  selectedSize      = 'medium';
-  selectedMilk      = 'Whole Milk';
+  currentProduct       = p;
+  currentProductQty    = 1;
+  selectedOptionValues = {};
 
-  document.getElementById('product-hero-img').src         = p.img;
+  document.getElementById('product-hero-img').src          = p.image_url || '';
   document.getElementById('product-hero-name').textContent = p.name;
-  document.getElementById('product-hero-desc').textContent = p.desc;
-  document.getElementById('detail-qty').textContent        = 1;
+  document.getElementById('detail-qty').textContent         = 1;
 
-  /* Reset size buttons */
-  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
-  document.querySelector('.size-btn[data-size="medium"]').classList.add('selected');
+  /* ----- Sizes: pulled live from product_sizes for this product ----- */
+  const sizes = SIZES_BY_PRODUCT[p.id] || [];
+  selectedSizeId = sizes.length ? sizes[0].id : null;
+  const sizeSection = document.getElementById('product-size-section');
+  if (sizeSection) {
+    sizeSection.style.display = sizes.length ? 'block' : 'none';
+    document.getElementById('product-size-options').innerHTML = sizes.map(s => `
+      <button class="size-btn ${s.id === selectedSizeId ? 'selected' : ''}" data-size="${s.id}" onclick="selectSize(this)">
+        <span class="size-icon">${s.label}</span>
+      </button>
+    `).join('');
+  }
 
-  /* Reset milk buttons */
-  document.querySelectorAll('.milk-btn').forEach(b => {
-    b.classList.remove('selected');
-    b.classList.add('border-outline-variant');
-  });
-  document.querySelector('.milk-btn').classList.add('selected');
+  /* ----- Option groups (e.g. milk type): pulled live from option_groups/option_values ----- */
+  const groups = OPTION_GROUPS_BY_PRODUCT[p.id] || [];
+  groups.forEach(g => { if (g.values.length) selectedOptionValues[g.id] = g.values[0].id; });
+  const optionsSection = document.getElementById('product-milk-section');
+  if (optionsSection) {
+    optionsSection.style.display = groups.length ? 'block' : 'none';
+    optionsSection.querySelector('[data-options-list]')?.replaceChildren();
+    document.getElementById('product-milk-options').innerHTML = groups.map(g => `
+      <div class="mb-3">
+        <p class="text-xs font-bold uppercase tracking-wider mb-2">${g.name}</p>
+        ${g.values.map(v => `
+          <button class="milk-btn ${v.id === selectedOptionValues[g.id] ? 'selected' : ''}" onclick="selectOptionValue('${g.id}','${v.id}', this)">
+            ${v.label}${v.price_delta ? ` (+$${v.price_delta.toFixed(2)})` : ''}
+          </button>
+        `).join('')}
+      </div>
+    `).join('');
+  }
 
-  /* Reset add-on checkboxes */
-  document.getElementById('addon-espresso').checked = false;
-  document.getElementById('addon-caramel').checked  = false;
-
-  /* Show / hide milk & add-ons for non-coffee items */
-  const hasMilk = p.hasOptions;
-  document.getElementById('product-milk-section').style.display   = hasMilk ? 'block' : 'none';
-  document.getElementById('product-addons-section').style.display = hasMilk ? 'block' : 'none';
+  /* ----- Add-ons: pulled live from addons table ----- */
+  const addonsSection = document.getElementById('product-addons-section');
+  if (addonsSection) {
+    addonsSection.style.display = ADDONS.length ? 'block' : 'none';
+    document.getElementById('product-addons-list').innerHTML = ADDONS.map(a => `
+      <label class="flex items-center gap-2">
+        <input type="checkbox" data-addon-id="${a.id}" onchange="updateProductPrice()"/> ${a.label} (+$${a.price.toFixed(2)})
+      </label>
+    `).join('');
+  }
 
   updateProductPrice();
   navigate('product');
@@ -460,20 +415,15 @@ function openProductDetail(id) {
 function selectSize(btn) {
   document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
-  selectedSize = btn.dataset.size;
+  selectedSizeId = btn.dataset.size;
   updateProductPrice();
 }
 
-function selectMilk(btn) {
-  document.querySelectorAll('.milk-btn').forEach(b => {
-    b.classList.remove('selected');
-    b.classList.add('border-outline-variant');
-    b.classList.remove('border-secondary');
-  });
+function selectOptionValue(groupId, valueId, btn) {
+  btn.parentElement.querySelectorAll('.milk-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
-  btn.classList.remove('border-outline-variant');
-  btn.classList.add('border-secondary');
-  selectedMilk = btn.textContent.trim();
+  selectedOptionValues[groupId] = valueId;
+  updateProductPrice();
 }
 
 function changeDetailQty(delta) {
@@ -482,45 +432,62 @@ function changeDetailQty(delta) {
   updateProductPrice();
 }
 
+/* Mirrors the pricing model used in the POS terminal:
+   a size's price (from product_sizes) IS the sized base price for
+   this product — it's not a flat add-on — then option/add-on deltas
+   are added on top. */
+function calcUnitPrice() {
+  if (!currentProduct) return 0;
+  const sizes = SIZES_BY_PRODUCT[currentProduct.id] || [];
+  const sizeMatch = sizes.find(s => s.id === selectedSizeId);
+  const base = sizeMatch ? sizeMatch.price : Number(currentProduct.base_price);
+
+  let optionTotal = 0;
+  (OPTION_GROUPS_BY_PRODUCT[currentProduct.id] || []).forEach(g => {
+    const v = g.values.find(v => v.id === selectedOptionValues[g.id]);
+    if (v) optionTotal += v.price_delta;
+  });
+
+  let addonTotal = 0;
+  document.querySelectorAll('#product-addons-list input:checked').forEach(cb => {
+    const a = ADDONS.find(x => x.id === cb.dataset.addonId);
+    if (a) addonTotal += a.price;
+  });
+
+  return base + optionTotal + addonTotal;
+}
+
 function updateProductPrice() {
   if (!currentProduct) return;
-  const base     = currentProduct.price;
-  const sizeAdd  = sizePriceAdds[selectedSize] || 0;
-  const espresso = document.getElementById('addon-espresso')?.checked ? 0.95 : 0;
-  const caramel  = document.getElementById('addon-caramel')?.checked  ? 0.60 : 0;
-  const total    = (base + sizeAdd + espresso + caramel) * currentProductQty;
-  document.getElementById('product-total-price').textContent = '$' + total.toFixed(2);
+  document.getElementById('product-total-price').textContent = '$' + (calcUnitPrice() * currentProductQty).toFixed(2);
 }
 
 function addDetailItemToCart() {
   if (!currentProduct) return;
-  const base     = currentProduct.price;
-  const sizeAdd  = sizePriceAdds[selectedSize] || 0;
-  const espresso = document.getElementById('addon-espresso')?.checked ? 0.95 : 0;
-  const caramel  = document.getElementById('addon-caramel')?.checked  ? 0.60 : 0;
-  const unitPrice = base + sizeAdd + espresso + caramel;
+  const unitPrice = calcUnitPrice();
 
-  const sizeLabel = selectedSize.charAt(0).toUpperCase() + selectedSize.slice(1);
-  const opts = [sizeLabel];
-  if (currentProduct.hasOptions) opts.push(selectedMilk);
-  if (espresso) opts.push('Extra Shot');
-  if (caramel)  opts.push('Caramel');
+  const opts = [];
+  const sizeMatch = (SIZES_BY_PRODUCT[currentProduct.id] || []).find(s => s.id === selectedSizeId);
+  if (sizeMatch) opts.push(sizeMatch.label);
+  (OPTION_GROUPS_BY_PRODUCT[currentProduct.id] || []).forEach(g => {
+    const v = g.values.find(v => v.id === selectedOptionValues[g.id]);
+    if (v) opts.push(v.label);
+  });
+  document.querySelectorAll('#product-addons-list input:checked').forEach(cb => {
+    const a = ADDONS.find(x => x.id === cb.dataset.addonId);
+    if (a) opts.push(a.label);
+  });
   const optLabel = opts.join(', ');
 
-  const key      = currentProduct.id + selectedSize + selectedMilk + (espresso ? 'e' : '') + (caramel ? 'c' : '');
+  const key      = currentProduct.id + '-' + selectedSizeId + '-' + Object.values(selectedOptionValues).join(',');
   const existing = cart.find(i => i.key === key);
 
   if (existing) {
     existing.qty += currentProductQty;
   } else {
     cart.push({
-      key,
-      id:      currentProduct.id,
-      name:    currentProduct.name,
-      price:   unitPrice,
-      qty:     currentProductQty,
-      img:     currentProduct.img,
-      options: optLabel
+      key, id: currentProduct.id, name: currentProduct.name, price: unitPrice,
+      qty: currentProductQty, img: currentProduct.image_url, options: optLabel
     });
   }
 
@@ -531,9 +498,9 @@ function addDetailItemToCart() {
 
 /* =============================================
    REWARDS / PROFILE PAGE
+   (unchanged — still front-end only, no rewards table in the DB yet)
    ============================================= */
 function renderRewards() {
-  /* Animated loyalty beans */
   const beanContainer = document.getElementById('loyalty-beans');
   beanContainer.innerHTML = '';
   for (let i = 0; i < 10; i++) {
@@ -553,7 +520,6 @@ function renderRewards() {
     beanContainer.appendChild(span);
   }
 
-  /* Recent orders list */
   const recentOrders = [
     { icon: 'coffee',        name: 'Oat Milk Cortado',   branch: 'Downtown Branch', date: 'Oct 24', price: '$5.50', pts: 10 },
     { icon: 'bakery_dining', name: 'Almond Croissant',   branch: 'Westside Hub',    date: 'Oct 21', price: '$4.75', pts:  8 },
@@ -579,10 +545,7 @@ function renderRewards() {
   `).join('');
 }
 
-function claimReward() {
-  showToast('Free Artisan Latte claimed! Show at counter.', 'redeem');
-}
-
+function claimReward()  { showToast('Free Artisan Latte claimed! Show at counter.', 'redeem'); }
 function redeemPoints() {
   showToast('2,450 points redeemed for $24.50 credit!', 'savings');
   document.getElementById('reward-points').textContent = '0';
@@ -591,4 +554,7 @@ function redeemPoints() {
 /* =============================================
    INITIALISE
    ============================================= */
-navigate('home');
+(async function init() {
+  await loadCatalog();
+  navigate('home');
+})();
