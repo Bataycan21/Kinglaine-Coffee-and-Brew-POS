@@ -340,13 +340,15 @@ function renderCartPage() {
 }
 
 function updateOrderSummary() {
-  const sub   = getCartTotal();
-  const tax   = sub * 0.085;
-  const fee   = 0.50;
-  const total = sub + tax + fee;
-  document.getElementById('order-subtotal').textContent = '$' + sub.toFixed(2);
-  document.getElementById('order-tax').textContent      = '$' + tax.toFixed(2);
-  document.getElementById('order-total').textContent    = '$' + total.toFixed(2);
+  console.log("updateOrderSummary() is running");
+
+  const total = getCartTotal();
+  const vatable = total / 1.12;
+  const vat = total - vatable;
+
+  document.getElementById('order-subtotal').textContent = '₱' + vatable.toFixed(2);
+  document.getElementById('order-tax').textContent = '₱' + vat.toFixed(2);
+  document.getElementById('order-total').textContent = '₱' + total.toFixed(2);
 }
 
 function applyPromo() {

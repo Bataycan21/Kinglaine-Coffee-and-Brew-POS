@@ -388,7 +388,7 @@
           <button onclick="setReportRange('all')" class="report-range-btn px-4 py-2 rounded-lg text-sm font-semibold" data-range="all">All Time</button>
         </div>
         <button onclick="exportReportPDF()" class="flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
-          <span class="material-symbols-outlined text-lg">picture_as_pdf</span> Export PDF
+          <span class="material-symbols-outlined text-lg">picture_as_pdf</span> Preview / Export PDF
         </button>
       </div>
     </div>
@@ -537,8 +537,8 @@
           <table class="w-full text-sm">
             <tbody>
               <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">Net Sales</td><td class="py-2 text-right font-semibold" id="inc-summary-sales">₱0.00</td></tr>
-              <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">− Cost of Sales</td><td class="py-2 text-right font-semibold text-error" id="inc-summary-cogs">₱0.00</td></tr>
-              <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">− Operating Expenses</td><td class="py-2 text-right font-semibold text-error" id="inc-summary-opex">₱0.00</td></tr>
+              <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">Cost of Sales</td><td class="py-2 text-right font-semibold text-error" id="inc-summary-cogs">₱0.00</td></tr>
+              <tr class="border-b border-outline-variant/10"><td class="py-2 text-on-surface-variant">Operating Expenses</td><td class="py-2 text-right font-semibold text-error" id="inc-summary-opex">₱0.00</td></tr>
               <tr><td class="py-2 font-bold text-primary">Net Profit</td><td class="py-2 text-right font-bold text-primary" id="inc-summary-profit">₱0.00</td></tr>
             </tbody>
           </table>
@@ -1106,6 +1106,31 @@
   </div>
 </div>
 
+<!-- ===== MODAL: PDF REPORT PREVIEW ===== -->
+<div class="modal-overlay" id="modal-pdf-preview">
+  <div class="bg-surface-container-lowest rounded-2xl w-[820px] max-w-[92vw] h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-outline-variant/20 flex justify-between items-center flex-shrink-0">
+      <div>
+        <h3 class="font-bold text-lg text-primary">Report Preview</h3>
+        <p class="text-xs text-on-surface-variant" id="pdf-preview-subtitle">Kinglaine Coffee & Brew</p>
+      </div>
+      <button onclick="closePdfPreview()" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="flex-1 bg-surface-container overflow-hidden">
+      <iframe id="pdf-preview-frame" class="w-full h-full border-0" title="Report preview"></iframe>
+    </div>
+    <div class="px-6 py-4 border-t border-outline-variant/20 flex items-center justify-between gap-4 flex-shrink-0">
+      <p class="text-xs text-on-surface-variant">Looks good? Download it to keep a copy.</p>
+      <div class="flex items-center gap-3">
+        <button onclick="closePdfPreview()" class="px-4 py-2.5 rounded-xl border-2 border-outline-variant font-semibold text-sm hover:border-secondary transition-all">Close</button>
+        <button onclick="downloadPreviewedPDF()" class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">download</span> Download PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL: CONFIRM DELETE ===== -->
 <div class="modal-overlay" id="modal-confirm-delete">
   <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6 text-center">
@@ -1129,7 +1154,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const TAX_RATE = 0.12;
-const CURRENCY = '₱';
+const CURRENCY = 'PHP ';
 let SIZE_OPTIONS = []; // loaded from the `sizes` table — see loadSizeOptions()
 async function loadSizeOptions() {
   const { data, error } = await sb.from('sizes').select('*').order('sort_order');
@@ -1326,6 +1351,8 @@ let payMethod = 'cash';
 let currentReportRange = 'today';
 let currentReportType = 'general';
 let currentStaffTab = 'accounts';
+let lastGeneratedReportDoc = null;
+let lastGeneratedReportFilename = '';
 let pendingProductImageFile = null;
 let pendingTableStatusChanges = {}; // { tableId: newStatus }
 
@@ -1392,6 +1419,13 @@ function showToast(msg, icon='check', isError=false) {
 }
 
 function fmt(n) { return CURRENCY + Number(n).toFixed(2); }
+
+// Plain, unsigned peso amount for a cash-drawer difference. Color alone
+// (green/red/amber, applied where this is used) indicates balanced vs
+// short vs over — no "+/-" prefix or extra wording needed.
+function fmtCashDiff(diff) {
+  return fmt(Math.abs(Number(diff)));
+}
 
 // ===================================================================
 // DATA LOADING: PRODUCTS + INGREDIENT STATUS
@@ -1739,8 +1773,19 @@ function renderProductGrid() {
 function handleProductTap(id) {
   const p = productsCache.find(x => x.id === id);
   if (!p) return;
-  if (computeProductStatus(id).status === 'out') { showToast('Out of ingredients', 'error', true); return; }
-  if (!activeOrderKey) { openOrderTypePrompt(); return; }
+
+  if (computeProductStatus(id).status === 'out') {
+    showToast('Out of ingredients', 'error', true);
+    return;
+  }
+
+  if (!activeOrderKey) {
+    openOrderTypePrompt();
+    return;
+  }
+
+  // All products open the customization modal — every product can have
+  // add-ons applied, even ones with no sizes or option groups of their own.
   openCustomizeModal(p);
 }
 
@@ -1751,23 +1796,29 @@ async function openCustomizeModal(p) {
   if (SIZE_OPTIONS.length === 0) await loadSizeOptions();
   customizeProduct = p;
   customQty = 1;
-  customSize = 'medium';
   customSelectedValues = {};
   document.getElementById('cust-name').textContent = p.name;
   document.getElementById('cust-base-price').textContent = fmt(p.base_price) + ' base price';
   document.getElementById('cust-qty').textContent = '1';
   document.getElementById('cust-note').value = '';
 
-  // Load this product's per-size price overrides, if any (falls back to
-  // base_price + the global size delta when a size isn't overridden)
+  // Load this product's per-size price overrides fresh from product_sizes.
+  // Only sizes present here for this product are shown at all — a size
+  // with no row in product_sizes is not offered for this product.
   const { data: sizePrices } = await sb.from('product_sizes').select('size_id, price').eq('product_id', p.id);
   customSizePrices = {};
   (sizePrices || []).forEach(sp => { customSizePrices[sp.size_id] = Number(sp.price); });
 
-  document.getElementById('cust-size-options').innerHTML = SIZE_OPTIONS.map(s => {
+  // Build the list of sizes available for THIS product from product_sizes,
+  // preserving the global SIZE_OPTIONS order, and auto-select the first one.
+  const availableSizes = SIZE_OPTIONS.filter(s => customSizePrices[s.id] !== undefined);
+  customSize = availableSizes.length ? availableSizes[0].id : null;
+
+  document.getElementById('cust-size-options').innerHTML = availableSizes
+  .map(s => {
     const override = customSizePrices[s.id];
     const priceHint = override !== undefined ? fmt(override) : fmt(p.base_price + s.add);
-    return `<button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id==='medium'?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all flex flex-col items-center gap-0.5">
+    return `<button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id===customSize?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all flex flex-col items-center gap-0.5">
       <span>${s.label}</span><span class="text-[10px] opacity-70">${priceHint}</span>
     </button>`;
   }).join('');
@@ -1909,12 +1960,24 @@ function removeTicketItem(key) {
   renderTicket();
 }
 function calcTotals(ticket) {
-  const subtotal = ticket.items.reduce((s,i) => s + i.unitPrice * i.qty, 0);
-  const discountAmt = subtotal * (ticket.discountPct || 0);
-  const taxable = subtotal - discountAmt;
-  const tax = taxable * TAX_RATE;
-  const total = taxable + tax;
-  return { subtotal, discountAmt, tax, total };
+  const totalBeforeDiscount = ticket.items.reduce((s, i) => s + i.unitPrice * i.qty, 0);
+
+  // Discount is applied to the VAT-inclusive price
+  const discountAmt = totalBeforeDiscount * (ticket.discountPct || 0);
+
+  // Customer's final payment (still VAT inclusive)
+  const total = totalBeforeDiscount - discountAmt;
+
+  // Extract VAT from the total
+  const subtotal = total / 1.12;   // VATable Sales
+  const tax = total - subtotal;    // VAT Amount
+
+  return {
+    subtotal,
+    discountAmt,
+    tax,
+    total
+  };
 }
 function renderTicket() {
   const ticket = getActiveTicket();
@@ -3411,8 +3474,8 @@ async function loadReports() {
     const netProfit = netSales - cogs - totalOpex;
     const margin = netSales > 0 ? (netProfit / netSales) * 100 : 0;
     document.getElementById('inc-summary-sales').textContent = fmt(netSales);
-    document.getElementById('inc-summary-cogs').textContent = '−' + fmt(cogs);
-    document.getElementById('inc-summary-opex').textContent = '−' + fmt(totalOpex);
+    document.getElementById('inc-summary-cogs').textContent = fmt(cogs);
+    document.getElementById('inc-summary-opex').textContent = fmt(totalOpex);
     document.getElementById('inc-summary-profit').textContent = fmt(netProfit);
 
     const marginCard = document.getElementById('inc-margin-card');
@@ -3445,7 +3508,7 @@ async function loadReports() {
           <td class="py-2 pr-4">${new Date(r.reconciled_date + 'T00:00:00').toLocaleDateString([], { month:'short', day:'numeric', year:'numeric' })}</td>
           <td class="py-2 pr-4 text-right">${fmt(r.expected_amount)}</td>
           <td class="py-2 pr-4 text-right">${fmt(r.counted_amount)}</td>
-          <td class="py-2 pr-4 text-right font-semibold ${diffCls}">${diff >= 0 ? '+' : ''}${fmt(diff)}</td>
+          <td class="py-2 pr-4 text-right font-semibold ${diffCls}">${fmtCashDiff(diff)}</td>
           <td class="py-2 pr-4 text-on-surface-variant text-xs">${r.notes || '—'}</td>
         </tr>
       `;
@@ -3609,7 +3672,7 @@ function updateReconcileDifference() {
   const counted = parseFloat(document.getElementById('reconcile-counted').value) || 0;
   const diff = counted - reconcileExpectedAmount;
   const el = document.getElementById('reconcile-difference');
-  el.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
+  el.textContent = fmtCashDiff(diff);
   el.className = 'font-semibold ' + (diff === 0 ? 'text-success' : (diff < 0 ? 'text-error' : 'text-warning'));
 }
 
@@ -3637,86 +3700,294 @@ async function saveCashReconciliation() {
 }
 
 // ===================================================================
-// PDF EXPORT
+// PDF EXPORT (professional layout + inline preview before download)
 // ===================================================================
-function exportReportPDF() {
+const PDF_BRAND = {
+  primary: [37, 22, 14],       // #25160e
+  secondary: [125, 86, 45],    // #7d562d
+  accent: [255, 202, 152],     // #ffca98 (secondary-container)
+  rowStripe: [248, 244, 219],  // #f8f4db (surface-container-low)
+  border: [211, 195, 189],     // #d3c3bd (outline-variant)
+  muted: [79, 69, 64],         // #4f4540 (on-surface-variant)
+  error: [186, 26, 26],        // #ba1a1a
+  success: [46, 125, 50]       // #2e7d32
+};
+
+// Reads plain text/number rows out of a "label / value" style breakdown
+// list (the little <div><span>Label</span><span>Value</span></div> blocks
+// used throughout the Reports view). Rows that are actually the "No sales
+// in this period." placeholder <p> are naturally excluded since we only
+// select the child <div> elements.
+function pdfBreakdownRows(containerId) {
+  return Array.from(document.querySelectorAll(`#${containerId} > div`)).map(div => {
+    const spans = div.querySelectorAll('span');
+    return [ (spans[0]?.textContent || '').trim(), (spans[1]?.textContent || '').trim() ];
+  });
+}
+
+// Reads <table><tbody id="..."> rows, skipping any placeholder row that
+// doesn't have the expected number of columns (e.g. "No data yet" rows
+// rendered as a single <td colspan="...">).
+function pdfTableRows(tbodyId, expectedCols) {
+  return Array.from(document.querySelectorAll(`#${tbodyId} tr`))
+    .map(tr => Array.from(tr.children).map(td => td.textContent.trim()))
+    .filter(r => r.length >= expectedCols)
+    .map(r => r.slice(0, expectedCols));
+}
+
+function pdfSectionTitle(doc, text, y) {
+  doc.setFontSize(11.5);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(...PDF_BRAND.secondary);
+  doc.text(text, 14, y);
+  doc.setDrawColor(...PDF_BRAND.accent);
+  doc.setLineWidth(0.6);
+  doc.line(14, y + 2, doc.internal.pageSize.getWidth() - 14, y + 2);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont(undefined, 'normal');
+  return y + 8;
+}
+
+// Ensures there's room for an upcoming section title + a little content
+// below it; otherwise starts a fresh page so headings never land at the
+// very bottom of a page with nothing underneath them.
+function pdfEnsureSpace(doc, y, needed = 24) {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  if (y + needed > pageHeight - 18) {
+    doc.addPage();
+    return 24;
+  }
+  return y;
+}
+
+function pdfTable(doc, y, head, body, opts = {}) {
+  if (!body.length) return y;
+  doc.autoTable({
+    startY: y,
+    head: [head],
+    body,
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3, textColor: [30, 20, 15], lineColor: PDF_BRAND.border, lineWidth: 0.2 },
+    headStyles: { fillColor: PDF_BRAND.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+    alternateRowStyles: { fillColor: PDF_BRAND.rowStripe },
+    margin: { left: 14, right: 14 },
+    ...opts
+  });
+  return doc.lastAutoTable.finalY + 10;
+}
+
+function pdfEmptyNote(doc, y, text) {
+  doc.setFontSize(9);
+  doc.setTextColor(...PDF_BRAND.muted);
+  doc.text(text, 14, y);
+  doc.setTextColor(0, 0, 0);
+  return y + 8;
+}
+
+function buildReportPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
   const rangeLabel = { today: 'Today', week: 'Last 7 Days', all: 'All Time' }[currentReportRange];
   const typeLabel = { general: 'General', income: 'Income', inventory: 'Inventory' }[currentReportType];
 
-  doc.setFontSize(16);
-  doc.text('Kinglaine Coffee & Brew', 14, 16);
-  doc.setFontSize(11);
-  doc.text(`${typeLabel} Report — ${rangeLabel}`, 14, 24);
-  doc.setFontSize(9);
-  doc.setTextColor(120);
-  doc.text(`Generated ${new Date().toLocaleString()}`, 14, 30);
-  doc.setTextColor(0);
+  // ---- Branded header band ----
+  doc.setFillColor(...PDF_BRAND.primary);
+  doc.rect(0, 0, pageWidth, 34, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(17);
+  doc.text('Kinglaine Coffee & Brew', 14, 15);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(10.5);
+  doc.text(`${typeLabel} Report — ${rangeLabel}`, 14, 23);
+  doc.setFontSize(8);
+  doc.setTextColor(230, 220, 210);
+  doc.text(`Generated ${new Date().toLocaleString()}  ·  by ${currentUser?.full_name || 'Staff'}`, 14, 29);
+  doc.setTextColor(0, 0, 0);
 
-  let y = 40;
+  let y = 44;
 
+  // =========================================================
   if (currentReportType === 'general') {
-    doc.autoTable({
-      startY: y,
-      head: [['Metric', 'Value']],
-      body: [
-        ['Gross Sales', document.getElementById('rep-gross').textContent],
-        ['Transactions', document.getElementById('rep-orders').textContent],
-        ['Avg. Ticket', document.getElementById('rep-avg').textContent],
-        ['Items Sold', document.getElementById('rep-items').textContent],
-      ]
+    y = pdfSectionTitle(doc, 'Summary', y);
+    y = pdfTable(doc, y, ['Metric', 'Value'], [
+      ['Gross Sales', document.getElementById('rep-gross').textContent],
+      ['Transactions', document.getElementById('rep-orders').textContent],
+      ['Avg. Ticket', document.getElementById('rep-avg').textContent],
+      ['Items Sold', document.getElementById('rep-items').textContent],
+      ['Discounts Given', `${document.getElementById('rep-discounts-total').textContent} (${document.getElementById('rep-discounts-count').textContent} txn)`],
+      ['Voided Transactions', `${document.getElementById('rep-voided-count').textContent} (${document.getElementById('rep-voided-total').textContent})`],
+    ], { columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } } });
+
+    const trendRows = Array.from(document.querySelectorAll('#rep-sales-trend > div')).map(div => {
+      const [label, val] = (div.getAttribute('title') || '').split(': ');
+      return [label || '', val || ''];
     });
-    y = doc.lastAutoTable.finalY + 10;
-    const txnRows = Array.from(document.querySelectorAll('#rep-transaction-log tr')).map(tr =>
-      Array.from(tr.children).map(td => td.textContent.trim())
-    );
-    doc.text('Transaction Log', 14, y);
-    doc.autoTable({ startY: y + 4, head: [['Receipt #','Date/Time','Type','Items','Method','Total']], body: txnRows });
+    if (trendRows.length) {
+      y = pdfEnsureSpace(doc, y);
+      y = pdfSectionTitle(doc, 'Sales Trend', y);
+      y = pdfTable(doc, y, ['Date', 'Sales'], trendRows);
+    }
+
+    const topItemRows = pdfBreakdownRows('rep-top-items');
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Top Selling Items', y);
+    y = topItemRows.length ? pdfTable(doc, y, ['Item', 'Sold'], topItemRows) : pdfEmptyNote(doc, y, 'No sales in this period.');
+
+    const paymentRows = pdfBreakdownRows('rep-payment-breakdown');
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Payment Method Breakdown', y);
+    y = paymentRows.length ? pdfTable(doc, y, ['Method', 'Total'], paymentRows) : pdfEmptyNote(doc, y, 'No sales in this period.');
+
+    const orderTypeRows = Array.from(document.querySelectorAll('#rep-order-type-breakdown > div')).map(div => {
+      const spans = div.querySelectorAll('span');
+      const label = (spans[0]?.textContent || '').trim();
+      const rest = (spans[1]?.textContent || '').trim().split(' · ');
+      return [label, rest[0] || '', rest[1] || ''];
+    });
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Dine-in vs Take Out', y);
+    y = orderTypeRows.length ? pdfTable(doc, y, ['Type', 'Orders', 'Total'], orderTypeRows) : pdfEmptyNote(doc, y, 'No sales in this period.');
+
+    const categoryRows = pdfBreakdownRows('rep-category-breakdown');
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Sales by Category', y);
+    y = categoryRows.length ? pdfTable(doc, y, ['Category', 'Total'], categoryRows) : pdfEmptyNote(doc, y, 'No sales in this period.');
+
+    const cashierRows = pdfBreakdownRows('rep-cashier-breakdown');
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Sales per Cashier', y);
+    y = cashierRows.length ? pdfTable(doc, y, ['Cashier', 'Total'], cashierRows) : pdfEmptyNote(doc, y, 'No sales in this period.');
+
+    const txnRows = pdfTableRows('rep-transaction-log', 6);
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Transaction Log', y);
+    y = txnRows.length
+      ? pdfTable(doc, y, ['Receipt #', 'Date/Time', 'Type', 'Items', 'Method', 'Total'], txnRows, { styles: { fontSize: 7.5 } })
+      : pdfEmptyNote(doc, y, 'No transactions in this period.');
   }
 
+  // =========================================================
   if (currentReportType === 'income') {
-    doc.autoTable({
-      startY: y,
-      head: [['Metric', 'Value']],
-      body: [
-        ['Net Sales', document.getElementById('inc-net-sales').textContent],
-        ['VAT Collected (12%)', document.getElementById('inc-vat').textContent],
-        ['Total Sales (incl. VAT)', document.getElementById('inc-total-sales').textContent],
-        ['Cost of Sales', document.getElementById('inc-cogs').textContent],
-        ['Current Inventory Value', document.getElementById('inc-inventory-value').textContent],
-        ['Profit Margin', document.getElementById('inc-margin').textContent + ' (' + document.getElementById('inc-margin-note').textContent + ')'],
-      ]
-    });
-    y = doc.lastAutoTable.finalY + 10;
-    doc.autoTable({
-      startY: y,
-      head: [['Profit Summary', 'Amount']],
-      body: [
-        ['Net Sales', document.getElementById('inc-summary-sales').textContent],
-        ['− Cost of Sales', document.getElementById('inc-summary-cogs').textContent],
-        ['− Operating Expenses', document.getElementById('inc-summary-opex').textContent],
-        ['Net Profit', document.getElementById('inc-summary-profit').textContent],
-      ]
-    });
+    y = pdfSectionTitle(doc, 'Summary', y);
+    const netSalesCompare = document.getElementById('inc-net-sales-compare').textContent.trim();
+    y = pdfTable(doc, y, ['Metric', 'Value'], [
+      ['Net Sales', document.getElementById('inc-net-sales').textContent + (netSalesCompare ? ` (${netSalesCompare})` : '')],
+      ['VAT Collected (12%)', document.getElementById('inc-vat').textContent],
+      ['Total Sales (incl. VAT)', document.getElementById('inc-total-sales').textContent],
+      ['Cost of Sales', document.getElementById('inc-cogs').textContent],
+      ['Current Inventory Value', document.getElementById('inc-inventory-value').textContent],
+      ['Profit Margin', document.getElementById('inc-margin').textContent + ' (' + document.getElementById('inc-margin-note').textContent + ')'],
+    ], { columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } } });
+
+    const expenseRows = pdfBreakdownRows('inc-expenses-breakdown');
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Operating Expenses', y);
+    y = expenseRows.length ? pdfTable(doc, y, ['Category', 'Amount'], expenseRows) : pdfEmptyNote(doc, y, 'No expenses logged in this period.');
+
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Profit Summary', y);
+    y = pdfTable(doc, y, ['Line', 'Amount'], [
+      ['Net Sales', document.getElementById('inc-summary-sales').textContent],
+      ['Cost of Sales', document.getElementById('inc-summary-cogs').textContent],
+      ['Operating Expenses', document.getElementById('inc-summary-opex').textContent],
+      ['Net Profit', document.getElementById('inc-summary-profit').textContent],
+    ], { columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } } });
+
+    const reconcileRows = pdfTableRows('inc-cash-reconciliation', 5);
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Cash Reconciliation', y);
+    y = reconcileRows.length ? pdfTable(doc, y, ['Date', 'Expected', 'Counted', 'Difference', 'Notes'], reconcileRows) : pdfEmptyNote(doc, y, 'No reconciliations logged in this period.');
   }
 
+  // =========================================================
   if (currentReportType === 'inventory') {
+    const lowStockCard = document.getElementById('inv-low-stock-card');
+    if (lowStockCard && lowStockCard.style.display !== 'none') {
+      const lowStockRows = Array.from(document.querySelectorAll('#inv-low-stock-alerts > div')).map(div => {
+        const ps = div.querySelectorAll('p');
+        return [(ps[0]?.textContent || '').trim(), (ps[1]?.textContent || '').trim()];
+      });
+      if (lowStockRows.length) {
+        y = pdfSectionTitle(doc, 'Needs Restocking Soon', y);
+        y = pdfTable(doc, y, ['Supply', 'Status'], lowStockRows, {
+          headStyles: { fillColor: PDF_BRAND.error, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 }
+        });
+      }
+    }
+
     const sizeRows = Array.from(document.querySelectorAll('#inv-size-breakdown > div')).map(card => {
-      const label = card.querySelector('p:first-child').textContent;
-      const qty = card.querySelector('p:nth-child(2)').textContent;
+      const label = card.querySelector('p:first-child').textContent.trim();
+      const qty = card.querySelector('p:nth-child(2)').textContent.trim();
       return [label, qty];
     });
-    doc.autoTable({ startY: y, head: [['Size', 'Units Sold']], body: sizeRows });
-    y = doc.lastAutoTable.finalY + 10;
-    const supplyRows = Array.from(document.querySelectorAll('#inv-supplies-usage tr')).map(tr =>
-      Array.from(tr.children).map(td => td.textContent.trim())
-    );
-    doc.text('Supplies Usage', 14, y);
-    doc.autoTable({ startY: y + 4, head: [['Supply','Used','Restocked','Cost','Current Level']], body: supplyRows });
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Sales by Size', y);
+    y = sizeRows.length ? pdfTable(doc, y, ['Size', 'Units Sold'], sizeRows) : pdfEmptyNote(doc, y, 'No sales in this period.');
+
+    const topItemRows = pdfBreakdownRows('inv-top-items');
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Top Selling Items', y);
+    y = topItemRows.length ? pdfTable(doc, y, ['Item', 'Sold'], topItemRows) : pdfEmptyNote(doc, y, 'No sales in this period.');
+
+    const supplyRows = pdfTableRows('inv-supplies-usage', 6);
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Supplies Usage', y);
+    y = supplyRows.length
+      ? pdfTable(doc, y, ['Supply', 'Used', 'Restocked', 'Cost', 'Current Level', 'Est. Days Left'], supplyRows)
+      : pdfEmptyNote(doc, y, 'No supply activity in this period.');
+
+    const wasteRows = pdfTableRows('inv-waste-log', 4);
+    y = pdfEnsureSpace(doc, y);
+    y = pdfSectionTitle(doc, 'Waste / Spoilage', y);
+    y = wasteRows.length ? pdfTable(doc, y, ['Supply', 'Qty Wasted', 'Notes', 'Date'], wasteRows) : pdfEmptyNote(doc, y, 'No waste logged in this period.');
   }
 
-  doc.save(`kinglaine-${typeLabel.toLowerCase()}-report-${currentReportRange}.pdf`);
+  // ---- Footer on every page: brand mark + page numbers ----
+  const pageCount = doc.internal.getNumberOfPages();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(...PDF_BRAND.border);
+    doc.setLineWidth(0.3);
+    doc.line(14, pageHeight - 14, pageWidth - 14, pageHeight - 14);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_BRAND.muted);
+    doc.text('Kinglaine POS · Confidential', 14, pageHeight - 9);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 14, pageHeight - 9, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+  }
+
+  return { doc, filename: `kinglaine-${typeLabel.toLowerCase()}-report-${currentReportRange}.pdf` };
+}
+
+// Builds the report and shows it inline in a preview modal first, so staff
+// can check it looks right before saving a copy to disk.
+function exportReportPDF() {
+  try {
+    const { doc, filename } = buildReportPDF();
+    lastGeneratedReportDoc = doc;
+    lastGeneratedReportFilename = filename;
+    const rangeLabel = { today: 'Today', week: 'Last 7 Days', all: 'All Time' }[currentReportRange];
+    const typeLabel = { general: 'General', income: 'Income', inventory: 'Inventory' }[currentReportType];
+    document.getElementById('pdf-preview-subtitle').textContent = `${typeLabel} Report — ${rangeLabel}`;
+    document.getElementById('pdf-preview-frame').src = doc.output('bloburl');
+    document.getElementById('modal-pdf-preview').classList.add('open');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to build PDF report', 'error', true);
+  }
+}
+
+function downloadPreviewedPDF() {
+  if (!lastGeneratedReportDoc) return;
+  lastGeneratedReportDoc.save(lastGeneratedReportFilename);
+}
+
+function closePdfPreview() {
+  closeModal('modal-pdf-preview');
+  document.getElementById('pdf-preview-frame').src = 'about:blank';
 }
 
 // ===================================================================
