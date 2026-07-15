@@ -120,7 +120,7 @@
       <button onclick="showView('takeout')" id="nav-takeout" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
         <span class="material-symbols-outlined text-lg">shopping_bag</span> Take Out
       </button>
-      <button onclick="showView('order')" id="nav-order" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+      <button onclick="handleOrderNavClick()" id="nav-order" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
         <span class="material-symbols-outlined text-lg">shopping_cart</span> Order
       </button>
       <button onclick="showView('inventory')" id="nav-inventory" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
@@ -238,8 +238,11 @@
         <div class="flex items-center gap-2 text-sm bg-error-container text-on-error-container px-3 py-1.5 rounded-full" id="low-stock-badge" style="display:none">
           <span class="material-symbols-outlined text-base">warning</span> <span id="low-stock-count">0</span> low stock
         </div>
-        <button onclick="openBulkResupplyModal()" class="admin-only flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+        <button onclick="openBulkResupplyModal()" class="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">local_shipping</span> Bulk Resupply
+        </button>
+        <button onclick="openLogWasteModal()" class="flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-error hover:text-error transition-all active:scale-95">
+          <span class="material-symbols-outlined text-lg">delete_sweep</span> Log Waste
         </button>
         <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">add</span> Add Supply
@@ -402,7 +405,7 @@
 
       <!-- ===== GENERAL REPORT ===== -->
       <div id="report-tab-general">
-        <div class="grid grid-cols-4 gap-5 mb-8">
+        <div class="grid grid-cols-4 gap-5 mb-5">
           <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
             <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Gross Sales</p>
             <p class="text-3xl font-bold text-primary" id="rep-gross">₱0.00</p>
@@ -421,6 +424,24 @@
           </div>
         </div>
 
+        <div class="grid grid-cols-2 gap-5 mb-8">
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Discounts Given</p>
+            <p class="text-2xl font-bold text-primary" id="rep-discounts-total">₱0.00</p>
+            <p class="text-xs text-on-surface-variant mt-1"><span id="rep-discounts-count">0</span> transaction(s) discounted</p>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Voided Transactions</p>
+            <p class="text-2xl font-bold text-error" id="rep-voided-count">0</p>
+            <p class="text-xs text-on-surface-variant mt-1"><span id="rep-voided-total">₱0.00</span> in voided sales</p>
+          </div>
+        </div>
+
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 mb-8">
+          <h3 class="font-bold text-primary mb-4">Sales Trend</h3>
+          <div id="rep-sales-trend" class="flex items-end gap-2" style="height:140px"></div>
+        </div>
+
         <div class="grid grid-cols-3 gap-6 mb-8">
           <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
             <h3 class="font-bold text-primary mb-4">Top Selling Items</h3>
@@ -436,6 +457,17 @@
           </div>
         </div>
 
+        <div class="grid grid-cols-2 gap-6 mb-8">
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <h3 class="font-bold text-primary mb-4">Sales by Category</h3>
+            <div id="rep-category-breakdown" class="space-y-3"></div>
+          </div>
+          <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+            <h3 class="font-bold text-primary mb-4">Sales per Cashier</h3>
+            <div id="rep-cashier-breakdown" class="space-y-3"></div>
+          </div>
+        </div>
+
         <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
           <h3 class="font-bold text-primary mb-4">Transaction Log</h3>
           <table class="w-full text-left text-sm">
@@ -447,6 +479,7 @@
                 <th class="py-2 pr-4">Items</th>
                 <th class="py-2 pr-4">Method</th>
                 <th class="py-2 pr-4 text-right">Total</th>
+                <th class="py-2 pr-4 admin-only text-right">Action</th>
               </tr>
             </thead>
             <tbody id="rep-transaction-log"></tbody>
@@ -460,10 +493,12 @@
           <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
             <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Net Sales</p>
             <p class="text-3xl font-bold text-primary" id="inc-net-sales">₱0.00</p>
+            <p class="text-xs mt-1" id="inc-net-sales-compare"></p>
           </div>
           <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
             <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">VAT Collected (12%)</p>
             <p class="text-3xl font-bold text-primary" id="inc-vat">₱0.00</p>
+            <p class="text-xs text-on-surface-variant mt-1">Payable to BIR (before input tax credits)</p>
           </div>
           <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
             <p class="text-xs uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Total Sales (incl. VAT)</p>
@@ -497,7 +532,7 @@
           </div>
         </div>
 
-        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 mb-8">
           <h3 class="font-bold text-primary mb-4">Profit Summary</h3>
           <table class="w-full text-sm">
             <tbody>
@@ -508,10 +543,34 @@
             </tbody>
           </table>
         </div>
+
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-primary">Cash Reconciliation</h3>
+            <button onclick="openCashReconcileModal()" class="text-xs font-semibold text-secondary hover:underline">+ Reconcile Cash</button>
+          </div>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
+                <th class="py-2 pr-4">Date</th>
+                <th class="py-2 pr-4 text-right">Expected</th>
+                <th class="py-2 pr-4 text-right">Counted</th>
+                <th class="py-2 pr-4 text-right">Difference</th>
+                <th class="py-2 pr-4">Notes</th>
+              </tr>
+            </thead>
+            <tbody id="inc-cash-reconciliation"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- ===== INVENTORY REPORT ===== -->
       <div id="report-tab-inventory" style="display:none">
+        <div class="bg-surface-container-low rounded-2xl p-6 border-2 border-error/30 bg-error/5 mb-8" id="inv-low-stock-card" style="display:none">
+          <h3 class="font-bold text-error mb-4 flex items-center gap-2"><span class="material-symbols-outlined">warning</span> Needs Restocking Soon</h3>
+          <div id="inv-low-stock-alerts" class="grid grid-cols-3 gap-3"></div>
+        </div>
+
         <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 mb-8">
           <h3 class="font-bold text-primary mb-4">Sales by Size</h3>
           <div id="inv-size-breakdown" class="grid grid-cols-3 gap-4"></div>
@@ -522,7 +581,7 @@
           <div id="inv-top-items" class="space-y-3"></div>
         </div>
 
-        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 mb-8">
           <h3 class="font-bold text-primary mb-4">Supplies Usage</h3>
           <table class="w-full text-left text-sm">
             <thead>
@@ -532,9 +591,25 @@
                 <th class="py-2 pr-4 text-right">Restocked (period)</th>
                 <th class="py-2 pr-4 text-right">Cost (used)</th>
                 <th class="py-2 pr-4 text-right">Current Level</th>
+                <th class="py-2 pr-4 text-right">Est. Days Left</th>
               </tr>
             </thead>
             <tbody id="inv-supplies-usage"></tbody>
+          </table>
+        </div>
+
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20">
+          <h3 class="font-bold text-primary mb-4">Waste / Spoilage (this period)</h3>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
+                <th class="py-2 pr-4">Supply</th>
+                <th class="py-2 pr-4 text-right">Quantity Wasted</th>
+                <th class="py-2 pr-4">Notes</th>
+                <th class="py-2 pr-4">Date</th>
+              </tr>
+            </thead>
+            <tbody id="inv-waste-log"></tbody>
           </table>
         </div>
       </div>
@@ -692,12 +767,24 @@
       <div>
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Base Price (₱)</label>
         <input id="pf-price" type="number" min="0" step="0.01" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
-        <p class="text-xs text-on-surface-variant mt-1">Shown on the product grid. Actual checkout price comes from the sizes below.</p>
+        <p class="text-xs text-on-surface-variant mt-1">Used when no size-specific price below is set.</p>
       </div>
       <div>
-        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Available Sizes & Pricing (₱)</label>
-        <p class="text-xs text-on-surface-variant mb-2">Check which sizes this item comes in — e.g. a croissant might only offer Medium and Large.</p>
-        <div class="space-y-2" id="pf-size-rows"></div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Size Pricing (₱) — optional, overrides Base Price per size</label>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Small</label>
+            <input id="pf-price-small" type="number" min="0" step="0.01" placeholder="e.g. 95" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
+          </div>
+          <div>
+            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Medium</label>
+            <input id="pf-price-medium" type="number" min="0" step="0.01" placeholder="e.g. 110" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
+          </div>
+          <div>
+            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Large</label>
+            <input id="pf-price-large" type="number" min="0" step="0.01" placeholder="e.g. 125" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
+          </div>
+        </div>
       </div>
       <div>
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Product Image</label>
@@ -885,6 +972,46 @@
   </div>
 </div>
 
+<!-- ===== MODAL: LOG WASTE ===== -->
+<div class="modal-overlay" id="modal-log-waste">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-lg text-primary">Log Waste / Spoilage</h3>
+      <button onclick="closeModal('modal-log-waste')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Supply</label>
+    <select id="waste-supply-select" onchange="updateWasteUnit()" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-3"></select>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Quantity Wasted (<span id="waste-unit-label"></span>)</label>
+    <input id="waste-qty" type="number" min="0.01" step="0.01" placeholder="e.g. 0.5" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-3"/>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Reason (optional)</label>
+    <input id="waste-notes" type="text" placeholder="e.g. spilled during prep, expired" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-4"/>
+    <button onclick="saveWasteLog()" class="w-full py-3 bg-error text-white rounded-xl font-semibold active:scale-95 transition-all">Log Waste</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: CASH RECONCILIATION ===== -->
+<div class="modal-overlay" id="modal-cash-reconcile">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-lg text-primary">Reconcile Cash Drawer</h3>
+      <button onclick="closeModal('modal-cash-reconcile')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="bg-surface-container rounded-lg px-3 py-2 mb-3 flex justify-between text-sm">
+      <span class="text-on-surface-variant">Expected (today's cash sales)</span>
+      <span class="font-semibold text-primary" id="reconcile-expected">₱0.00</span>
+    </div>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Counted Amount (₱)</label>
+    <input id="reconcile-counted" type="number" min="0" step="0.01" placeholder="Count the drawer and enter it here" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-3" oninput="updateReconcileDifference()"/>
+    <div class="flex justify-between text-sm mb-3">
+      <span class="text-on-surface-variant">Difference</span>
+      <span class="font-semibold" id="reconcile-difference">₱0.00</span>
+    </div>
+    <label class="text-xs font-semibold text-on-surface-variant block mb-1">Notes (optional)</label>
+    <input id="reconcile-notes" type="text" placeholder="e.g. short due to change error" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none mb-4"/>
+    <button onclick="saveCashReconciliation()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Save Reconciliation</button>
+  </div>
+</div>
+
 <!-- ===== MODAL: RECIPE & OPTIONS (per product, admin only) ===== -->
 <div class="modal-overlay" id="modal-recipe">
   <div class="bg-surface-container-lowest rounded-2xl w-[560px] max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl">
@@ -956,6 +1083,26 @@
         <button onclick="cancelEditAddon()" id="addon-cancel-btn" class="px-4 py-2.5 border-2 border-outline-variant rounded-lg text-sm font-semibold" style="display:none">Cancel</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: CHOOSE ORDER TYPE (shown before entering Order with nothing active) ===== -->
+<div class="modal-overlay" id="modal-order-type">
+  <div class="bg-surface-container-lowest rounded-2xl w-96 shadow-2xl p-6 text-center">
+    <span class="material-symbols-outlined text-5xl text-secondary mb-3">receipt_long</span>
+    <h3 class="font-bold text-lg text-primary mb-1">Start an Order</h3>
+    <p class="text-sm text-on-surface-variant mb-6">Is this for a table, or a take out?</p>
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <button onclick="chooseOrderType('dinein')" class="flex flex-col items-center gap-2 py-5 rounded-xl border-2 border-outline-variant hover:border-secondary transition-all active:scale-95">
+        <span class="material-symbols-outlined text-2xl">table_restaurant</span>
+        <span class="text-sm font-semibold">Dine In</span>
+      </button>
+      <button onclick="chooseOrderType('takeout')" class="flex flex-col items-center gap-2 py-5 rounded-xl border-2 border-outline-variant hover:border-secondary transition-all active:scale-95">
+        <span class="material-symbols-outlined text-2xl">shopping_bag</span>
+        <span class="text-sm font-semibold">Take Out</span>
+      </button>
+    </div>
+    <button onclick="closeModal('modal-order-type')" class="text-sm font-semibold text-on-surface-variant hover:underline">Cancel</button>
   </div>
 </div>
 
@@ -1212,6 +1359,20 @@ function showView(view) {
   if (view === 'products') loadProductsManagement();
   if (view === 'reports') loadReports();
   if (view === 'staff') { setStaffTab(currentStaffTab); }
+}
+
+// Clicking "Order" in the top nav: if there's already an order in progress
+// (a table or takeout was picked), go straight there. Otherwise ask Dine In
+// or Take Out first, so nothing gets rung up by accident.
+function handleOrderNavClick() {
+  if (activeOrderKey) { showView('order'); return; }
+  openOrderTypePrompt();
+}
+function openOrderTypePrompt() { document.getElementById('modal-order-type').classList.add('open'); }
+function chooseOrderType(type) {
+  closeModal('modal-order-type');
+  if (type === 'dinein') { showView('tables'); }
+  else { startTakeoutOrder(); }
 }
 
 function tickClock() {
@@ -1579,7 +1740,7 @@ function handleProductTap(id) {
   const p = productsCache.find(x => x.id === id);
   if (!p) return;
   if (computeProductStatus(id).status === 'out') { showToast('Out of ingredients', 'error', true); return; }
-  if (!activeOrderKey) startTakeoutOrder();
+  if (!activeOrderKey) { openOrderTypePrompt(); return; }
   openCustomizeModal(p);
 }
 
@@ -1590,28 +1751,23 @@ async function openCustomizeModal(p) {
   if (SIZE_OPTIONS.length === 0) await loadSizeOptions();
   customizeProduct = p;
   customQty = 1;
+  customSize = 'medium';
   customSelectedValues = {};
   document.getElementById('cust-name').textContent = p.name;
   document.getElementById('cust-base-price').textContent = fmt(p.base_price) + ' base price';
   document.getElementById('cust-qty').textContent = '1';
   document.getElementById('cust-note').value = '';
 
-  // This product's available sizes + prices. If it has no product_sizes rows
-  // at all (never edited under the new size checkboxes), fall back to
-  // offering every global size at base_price + delta, same as before.
+  // Load this product's per-size price overrides, if any (falls back to
+  // base_price + the global size delta when a size isn't overridden)
   const { data: sizePrices } = await sb.from('product_sizes').select('size_id, price').eq('product_id', p.id);
   customSizePrices = {};
   (sizePrices || []).forEach(sp => { customSizePrices[sp.size_id] = Number(sp.price); });
-  const availableSizes = (sizePrices && sizePrices.length)
-    ? SIZE_OPTIONS.filter(s => s.id in customSizePrices)
-    : SIZE_OPTIONS;
 
-  customSize = availableSizes.some(s => s.id === 'medium') ? 'medium' : (availableSizes[0]?.id || 'medium');
-
-  document.getElementById('cust-size-options').innerHTML = availableSizes.map(s => {
+  document.getElementById('cust-size-options').innerHTML = SIZE_OPTIONS.map(s => {
     const override = customSizePrices[s.id];
     const priceHint = override !== undefined ? fmt(override) : fmt(p.base_price + s.add);
-    return `<button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id===customSize?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all flex flex-col items-center gap-0.5">
+    return `<button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id==='medium'?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all flex flex-col items-center gap-0.5">
       <span>${s.label}</span><span class="text-[10px] opacity-70">${priceHint}</span>
     </button>`;
   }).join('');
@@ -1982,7 +2138,7 @@ async function loadSupplies() {
           <td class="py-3 pr-4 text-on-surface-variant uppercase text-xs">${s.unit}</td>
           <td class="py-3 pr-4 font-bold">${s.quantity_on_hand}</td>
           <td class="py-3 pr-4">${statusHtml}</td>
-          <td class="py-3 pr-4 admin-only ${currentUser.role!=='admin'?'role-hidden':''}">
+          <td class="py-3 pr-4">
             <button onclick="openRestockSupplyModal('${s.id}','${s.name.replace(/'/g,"\\'")}','${s.unit}')" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
               <span class="material-symbols-outlined text-sm">add_box</span> Restock
             </button>
@@ -2163,6 +2319,54 @@ async function saveBulkResupply() {
   }
 }
 
+// ===================================================================
+// LOG WASTE / SPOILAGE
+// ===================================================================
+let wasteSuppliesCache = [];
+
+async function openLogWasteModal() {
+  try {
+    const { data, error } = await sb.from('supplies').select('id,name,unit,quantity_on_hand').order('name');
+    if (error) throw error;
+    wasteSuppliesCache = data;
+    document.getElementById('waste-supply-select').innerHTML = data.map(s => `<option value="${s.id}">${s.name} (${Number(s.quantity_on_hand).toFixed(2)} ${s.unit} on hand)</option>`).join('');
+    document.getElementById('waste-qty').value = '';
+    document.getElementById('waste-notes').value = '';
+    updateWasteUnit();
+    document.getElementById('modal-log-waste').classList.add('open');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load supplies', 'error', true);
+  }
+}
+
+function updateWasteUnit() {
+  const supply = wasteSuppliesCache.find(s => s.id === document.getElementById('waste-supply-select').value);
+  document.getElementById('waste-unit-label').textContent = supply ? supply.unit : '';
+}
+
+async function saveWasteLog() {
+  const supplyId = document.getElementById('waste-supply-select').value;
+  const qty = parseFloat(document.getElementById('waste-qty').value);
+  const notes = document.getElementById('waste-notes').value.trim();
+  const supply = wasteSuppliesCache.find(s => s.id === supplyId);
+  if (!supply) { showToast('Pick a supply', 'error', true); return; }
+  if (isNaN(qty) || qty <= 0) { showToast('Enter a valid quantity', 'error', true); return; }
+  if (qty > Number(supply.quantity_on_hand)) { showToast(`Only ${supply.quantity_on_hand} ${supply.unit} on hand`, 'error', true); return; }
+  try {
+    const newQty = Number(supply.quantity_on_hand) - qty;
+    const { error: updErr } = await sb.from('supplies').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('id', supplyId);
+    if (updErr) throw updErr;
+    await sb.from('supply_logs').insert({ supply_id: supplyId, change_qty: -qty, reason: 'waste', performed_by: currentUser.id, notes: notes || null });
+    showToast('Waste logged', 'check');
+    closeModal('modal-log-waste');
+    loadSupplies();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to log waste', 'error', true);
+  }
+}
+
 async function removeSupply(id, name) {
   if (!confirm(`Remove ${name}? This cannot be undone.`)) return;
   try {
@@ -2237,19 +2441,17 @@ async function openProductFormModal(product) {
   document.getElementById('pf-price').value = product ? product.base_price : '';
   document.getElementById('pf-image').value = product ? (product.image_url || '') : '';
   document.getElementById('pf-is-active').checked = product ? product.is_active : true;
+  document.getElementById('pf-price-small').value = '';
+  document.getElementById('pf-price-medium').value = '';
+  document.getElementById('pf-price-large').value = '';
 
-  if (SIZE_OPTIONS.length === 0) await loadSizeOptions();
-  let existingSizes = [];
   if (product) {
-    const { data } = await sb.from('product_sizes').select('size_id, price').eq('product_id', product.id);
-    existingSizes = data || [];
+    const { data: sizePrices } = await sb.from('product_sizes').select('size_id, price').eq('product_id', product.id);
+    (sizePrices || []).forEach(sp => {
+      const el = document.getElementById(`pf-price-${sp.size_id}`);
+      if (el) el.value = sp.price;
+    });
   }
-  // Legacy/new products with no product_sizes rows yet default to "all sizes enabled"
-  // (matches the old fallback behavior); once saved, only the checked sizes remain offered.
-  const enabledIds = existingSizes.length ? existingSizes.map(s => s.size_id) : SIZE_OPTIONS.map(s => s.id);
-  const priceById = {};
-  existingSizes.forEach(s => { priceById[s.size_id] = s.price; });
-  renderPfSizeRows(enabledIds, priceById, product);
 
   pendingProductImageFile = null;
   document.getElementById('pf-image-file').value = '';
@@ -2266,30 +2468,6 @@ async function openProductFormModal(product) {
   }
 
   document.getElementById('modal-product-form').classList.add('open');
-}
-
-function renderPfSizeRows(enabledIds, priceById, product) {
-  const container = document.getElementById('pf-size-rows');
-  container.innerHTML = SIZE_OPTIONS.map(s => {
-    const checked = enabledIds.includes(s.id);
-    const priceVal = priceById[s.id] !== undefined
-      ? priceById[s.id]
-      : (product ? (Number(product.base_price) + s.add).toFixed(2) : '');
-    return `
-      <div class="flex items-center gap-2 bg-surface-container rounded-lg px-3 py-2">
-        <input type="checkbox" id="pf-size-enabled-${s.id}" class="w-4 h-4 accent-secondary" onchange="togglePfSizeRow('${s.id}')" ${checked ? 'checked' : ''}/>
-        <span class="flex-1 text-sm font-medium">${s.label}</span>
-        <input type="number" min="0" step="0.01" id="pf-size-price-${s.id}" value="${priceVal}" placeholder="Price"
-          class="w-24 bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2 py-1.5 text-sm outline-none disabled:opacity-40"
-          ${checked ? '' : 'disabled'}/>
-      </div>
-    `;
-  }).join('');
-}
-
-function togglePfSizeRow(sizeId) {
-  const enabled = document.getElementById(`pf-size-enabled-${sizeId}`).checked;
-  document.getElementById(`pf-size-price-${sizeId}`).disabled = !enabled;
 }
 
 function handleProductImageSelect(event) {
@@ -2322,18 +2500,14 @@ async function saveProductForm() {
   const price = parseFloat(document.getElementById('pf-price').value);
   let image_url = document.getElementById('pf-image').value.trim();
   const is_active = document.getElementById('pf-is-active').checked;
-
-  const sizeSelections = SIZE_OPTIONS.map(s => ({
-    sizeId: s.id,
-    enabled: document.getElementById(`pf-size-enabled-${s.id}`).checked,
-    priceVal: document.getElementById(`pf-size-price-${s.id}`).value
-  }));
+  const sizePriceInputs = {
+    small: document.getElementById('pf-price-small').value,
+    medium: document.getElementById('pf-price-medium').value,
+    large: document.getElementById('pf-price-large').value
+  };
 
   if (!name) { showToast('Name is required', 'error', true); return; }
   if (isNaN(price) || price < 0) { showToast('Enter a valid price', 'error', true); return; }
-  if (!sizeSelections.some(s => s.enabled)) { showToast('Select at least one size', 'error', true); return; }
-  const badSize = sizeSelections.find(s => s.enabled && (s.priceVal === '' || isNaN(parseFloat(s.priceVal)) || parseFloat(s.priceVal) < 0));
-  if (badSize) { showToast('Enter a valid price for every checked size', 'error', true); return; }
 
   try {
     if (pendingProductImageFile) {
@@ -2357,16 +2531,16 @@ async function saveProductForm() {
       showToast('Product created — add its ingredients in Recipe', 'check');
     }
 
-    // Sizes: a checked box upserts that size's availability + price; an
-    // unchecked box removes it entirely, so it won't be offered at checkout.
-    for (const { sizeId, enabled, priceVal } of sizeSelections) {
-      if (enabled) {
+    // Save per-size price overrides: a filled field upserts a price, an
+    // emptied field removes the override (falling back to Base Price + global delta)
+    for (const [sizeId, val] of Object.entries(sizePriceInputs)) {
+      if (val === '') {
+        await sb.from('product_sizes').delete().eq('product_id', productId).eq('size_id', sizeId);
+      } else {
         await sb.from('product_sizes').upsert(
-          { product_id: productId, size_id: sizeId, price: parseFloat(priceVal) },
+          { product_id: productId, size_id: sizeId, price: parseFloat(val) },
           { onConflict: 'product_id,size_id' }
         );
-      } else {
-        await sb.from('product_sizes').delete().eq('product_id', productId).eq('size_id', sizeId);
       }
     }
 
@@ -2835,37 +3009,6 @@ function setStaffTab(tab) {
   if (tab === 'shifts') loadShiftLog();
 }
 
-async function loadStaffManagement() {
-  document.getElementById('staff-loading').style.display = 'flex';
-  document.getElementById('staff-table').style.display = 'none';
-  try {
-    const { data: staff, error } = await sb.from('users').select('*').order('username');
-    if (error) throw error;
-
-    document.getElementById('staff-tbody').innerHTML = staff.map(u => `
-      <tr class="border-b border-outline-variant/10">
-        <td class="py-3 pr-4 font-medium">${u.username}</td>
-        <td class="py-3 pr-4">${u.full_name}</td>
-        <td class="py-3 pr-4 capitalize">${u.role}</td>
-        <td class="py-3 pr-4">
-          <span class="stock-pill ${u.is_active ? 'bg-success/15 text-success' : 'bg-error/15 text-error'}">${u.is_active ? 'Active' : 'Disabled'}</span>
-        </td>
-        <td class="py-3 pr-4 text-right">
-          <button onclick="toggleStaffActive('${u.id}', ${u.is_active})" class="text-sm font-semibold text-secondary hover:underline">
-            ${u.is_active ? 'Disable' : 'Enable'}
-          </button>
-        </td>
-      </tr>
-    `).join('');
-  } catch (e) {
-    console.error(e);
-    showToast('Failed to load staff', 'error', true);
-  } finally {
-    document.getElementById('staff-loading').style.display = 'none';
-    document.getElementById('staff-table').style.display = 'table';
-  }
-}
-
 // ---- Shift Log tab: automatic clock-out setting + per-cashier clock in/out history ----
 async function loadShiftLog() {
   document.getElementById('shift-log-loading').style.display = 'flex';
@@ -2919,6 +3062,37 @@ async function saveAutoLogoutTime() {
   } catch (e) {
     console.error(e);
     showToast('Failed to save setting', 'error', true);
+  }
+}
+
+async function loadStaffManagement() {
+  document.getElementById('staff-loading').style.display = 'flex';
+  document.getElementById('staff-table').style.display = 'none';
+  try {
+    const { data: staff, error } = await sb.from('users').select('*').order('username');
+    if (error) throw error;
+
+    document.getElementById('staff-tbody').innerHTML = staff.map(u => `
+      <tr class="border-b border-outline-variant/10">
+        <td class="py-3 pr-4 font-medium">${u.username}</td>
+        <td class="py-3 pr-4">${u.full_name}</td>
+        <td class="py-3 pr-4 capitalize">${u.role}</td>
+        <td class="py-3 pr-4">
+          <span class="stock-pill ${u.is_active ? 'bg-success/15 text-success' : 'bg-error/15 text-error'}">${u.is_active ? 'Active' : 'Disabled'}</span>
+        </td>
+        <td class="py-3 pr-4 text-right">
+          <button onclick="toggleStaffActive('${u.id}', ${u.is_active})" class="text-sm font-semibold text-secondary hover:underline">
+            ${u.is_active ? 'Disable' : 'Enable'}
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load staff', 'error', true);
+  } finally {
+    document.getElementById('staff-loading').style.display = 'none';
+    document.getElementById('staff-table').style.display = 'table';
   }
 }
 
@@ -3006,6 +3180,19 @@ function rangeStartDate(range) {
   return null; // all time
 }
 
+async function confirmVoidTransaction(id, receiptNumber) {
+  if (!confirm(`Void receipt ${receiptNumber}?\n\nThis removes it from sales totals, but does NOT automatically restore ingredient stock (the exact milk/bean/add-on choices used aren't stored per-sale). If the drink wasn't actually made, adjust Supplies manually.`)) return;
+  try {
+    const { error } = await sb.from('transactions').update({ status: 'voided' }).eq('id', id);
+    if (error) throw error;
+    showToast('Transaction voided', 'check');
+    loadReports();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to void transaction', 'error', true);
+  }
+}
+
 async function loadReports() {
   document.getElementById('reports-loading').style.display = 'flex';
   document.getElementById('reports-content').style.display = 'none';
@@ -3081,9 +3268,79 @@ async function loadReports() {
           <td class="py-2 pr-4">${lineCount}</td>
           <td class="py-2 pr-4 capitalize">${t.payment_method === 'gcash' ? 'GCash' : t.payment_method}</td>
           <td class="py-2 pr-4 text-right font-semibold">${fmt(t.total)}</td>
+          <td class="py-2 pr-4 admin-only text-right ${currentUser.role!=='admin'?'role-hidden':''}">
+            <button onclick="confirmVoidTransaction('${t.id}','${t.receipt_number}')" class="text-error text-xs font-semibold hover:underline">Void</button>
+          </td>
         </tr>
       `;
-    }).join('') : `<tr><td colspan="6" class="py-6 text-center text-sm text-on-surface-variant">No transactions in this period.</td></tr>`;
+    }).join('') : `<tr><td colspan="7" class="py-6 text-center text-sm text-on-surface-variant">No transactions in this period.</td></tr>`;
+
+    // Discounts given
+    const discountedTxns = txns.filter(t => Number(t.discount_amount) > 0);
+    const discountTotal = discountedTxns.reduce((s,t) => s + Number(t.discount_amount), 0);
+    document.getElementById('rep-discounts-total').textContent = fmt(discountTotal);
+    document.getElementById('rep-discounts-count').textContent = discountedTxns.length;
+
+    // Voided transactions (separate query — main list excludes them)
+    let voidQuery = sb.from('transactions').select('id, total').eq('status', 'voided');
+    if (start) voidQuery = voidQuery.gte('created_at', start.toISOString());
+    const { data: voidedTxns, error: vErr } = await voidQuery;
+    if (vErr) throw vErr;
+    const voidedTotal = (voidedTxns || []).reduce((s,t) => s + Number(t.total), 0);
+    document.getElementById('rep-voided-count').textContent = (voidedTxns || []).length;
+    document.getElementById('rep-voided-total').textContent = fmt(voidedTotal);
+
+    // Sales trend — bucket by calendar day
+    const dayTotals = {};
+    txns.forEach(t => {
+      const day = new Date(t.created_at).toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
+      dayTotals[day] = (dayTotals[day] || 0) + Number(t.total);
+    });
+    const sortedDays = Object.keys(dayTotals).sort();
+    const maxDay = Math.max(1, ...Object.values(dayTotals));
+    document.getElementById('rep-sales-trend').innerHTML = sortedDays.length ? sortedDays.map(day => {
+      const val = dayTotals[day];
+      const heightPct = Math.max(4, (val / maxDay) * 100);
+      const label = new Date(day + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return `
+        <div class="flex-1 flex flex-col items-center justify-end h-full gap-1" title="${label}: ${fmt(val)}">
+          <span class="text-[10px] text-on-surface-variant">${fmt(val)}</span>
+          <div class="w-full bg-secondary rounded-t-md" style="height:${heightPct}%"></div>
+          <span class="text-[10px] text-on-surface-variant">${label}</span>
+        </div>
+      `;
+    }).join('') : `<p class="text-sm text-on-surface-variant w-full text-center self-center">No sales in this period.</p>`;
+
+    // Sales by category (needs product category lookup)
+    const { data: allProducts, error: prErr } = await sb.from('products').select('id, category');
+    if (prErr) throw prErr;
+    const categoryById = {};
+    allProducts.forEach(p => { categoryById[p.id] = p.category; });
+    const categoryTotals = {};
+    items.forEach(i => {
+      const cat = categoryById[i.product_id] || 'other';
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(i.line_total);
+    });
+    const categoryLabels = { coffee: 'Coffee', tea: 'Tea', bakery: 'Bakery', frappe: 'Frappe', other: 'Other' };
+    document.getElementById('rep-category-breakdown').innerHTML = Object.keys(categoryTotals).length
+      ? Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([cat,total]) => `
+        <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium">${categoryLabels[cat]||cat}</span><span class="text-on-surface-variant font-semibold">${fmt(total)}</span></div>
+      `).join('') : `<p class="text-sm text-on-surface-variant">No sales in this period.</p>`;
+
+    // Sales per cashier
+    const { data: allUsers, error: usrErr } = await sb.from('users').select('id, full_name');
+    if (usrErr) throw usrErr;
+    const nameById = {};
+    allUsers.forEach(u => { nameById[u.id] = u.full_name; });
+    const cashierTotals = {};
+    txns.forEach(t => {
+      const name = nameById[t.cashier_id] || 'Unknown';
+      cashierTotals[name] = (cashierTotals[name] || 0) + Number(t.total);
+    });
+    document.getElementById('rep-cashier-breakdown').innerHTML = Object.keys(cashierTotals).length
+      ? Object.entries(cashierTotals).sort((a,b)=>b[1]-a[1]).map(([name,total]) => `
+        <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium">${name}</span><span class="text-on-surface-variant font-semibold">${fmt(total)}</span></div>
+      `).join('') : `<p class="text-sm text-on-surface-variant">No sales in this period.</p>`;
 
     // =========================================================
     // INCOME REPORT
@@ -3095,6 +3352,29 @@ async function loadReports() {
     document.getElementById('inc-net-sales').textContent = fmt(netSales);
     document.getElementById('inc-vat').textContent = fmt(vat);
     document.getElementById('inc-total-sales').textContent = fmt(totalSalesInclVat);
+
+    // Period-over-period comparison (skipped for "All Time" — no meaningful "previous" period)
+    const compareEl = document.getElementById('inc-net-sales-compare');
+    if (currentReportRange === 'all') {
+      compareEl.textContent = '';
+    } else {
+      const periodMs = currentReportRange === 'today' ? 24*60*60*1000 : 7*24*60*60*1000;
+      const prevStart = new Date(start.getTime() - periodMs);
+      const prevEnd = new Date(start.getTime());
+      const { data: prevTxns, error: prevErr } = await sb.from('transactions').select('subtotal, discount_amount')
+        .eq('status', 'completed').gte('created_at', prevStart.toISOString()).lt('created_at', prevEnd.toISOString());
+      if (prevErr) throw prevErr;
+      const prevNetSales = (prevTxns || []).reduce((s,t) => s + (Number(t.subtotal) - Number(t.discount_amount)), 0);
+      if (prevNetSales > 0) {
+        const pctChange = ((netSales - prevNetSales) / prevNetSales) * 100;
+        const sign = pctChange >= 0 ? '+' : '';
+        compareEl.textContent = `${sign}${pctChange.toFixed(1)}% vs previous period`;
+        compareEl.className = 'text-xs mt-1 ' + (pctChange >= 0 ? 'text-success' : 'text-error');
+      } else {
+        compareEl.textContent = netSales > 0 ? 'No sales in previous period' : '';
+        compareEl.className = 'text-xs mt-1 text-on-surface-variant';
+      }
+    }
 
     // Cost of Sales — ingredient usage this period, valued at current unit cost
     let usageQuery = sb.from('supply_logs').select('*, supplies(unit_cost)').eq('reason', 'usage');
@@ -3152,9 +3432,44 @@ async function loadReports() {
       marginNote.textContent = 'Above target range';
     }
 
+    // Cash reconciliation history
+    let reconcileQuery = sb.from('cash_reconciliations').select('*').order('reconciled_date', { ascending: false });
+    if (start) reconcileQuery = reconcileQuery.gte('reconciled_date', start.toISOString().slice(0,10));
+    const { data: reconciliations, error: recErr } = await reconcileQuery;
+    if (recErr) throw recErr;
+    document.getElementById('inc-cash-reconciliation').innerHTML = (reconciliations && reconciliations.length) ? reconciliations.map(r => {
+      const diff = Number(r.difference);
+      const diffCls = diff === 0 ? 'text-success' : (diff < 0 ? 'text-error' : 'text-warning');
+      return `
+        <tr class="border-b border-outline-variant/10">
+          <td class="py-2 pr-4">${new Date(r.reconciled_date + 'T00:00:00').toLocaleDateString([], { month:'short', day:'numeric', year:'numeric' })}</td>
+          <td class="py-2 pr-4 text-right">${fmt(r.expected_amount)}</td>
+          <td class="py-2 pr-4 text-right">${fmt(r.counted_amount)}</td>
+          <td class="py-2 pr-4 text-right font-semibold ${diffCls}">${diff >= 0 ? '+' : ''}${fmt(diff)}</td>
+          <td class="py-2 pr-4 text-on-surface-variant text-xs">${r.notes || '—'}</td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="5" class="py-6 text-center text-sm text-on-surface-variant">No reconciliations logged in this period.</td></tr>`;
+
     // =========================================================
     // INVENTORY REPORT
     // =========================================================
+
+    // Low-stock alerts (snapshot, not date-ranged)
+    const lowStockSupplies = allSupplies.filter(s => Number(s.quantity_on_hand) <= Number(s.low_stock_threshold));
+    const lowStockCard = document.getElementById('inv-low-stock-card');
+    if (lowStockSupplies.length) {
+      lowStockCard.style.display = 'block';
+      document.getElementById('inv-low-stock-alerts').innerHTML = lowStockSupplies.map(s => `
+        <div class="bg-surface-container-lowest rounded-lg p-3">
+          <p class="font-semibold text-sm text-primary">${s.name}</p>
+          <p class="text-xs text-error">${Number(s.quantity_on_hand).toFixed(2)} ${s.unit} left (threshold: ${Number(s.low_stock_threshold).toFixed(2)})</p>
+        </div>
+      `).join('');
+    } else {
+      lowStockCard.style.display = 'none';
+    }
+
     const { data: sizes, error: szErr } = await sb.from('sizes').select('*').order('sort_order');
     if (szErr) throw szErr;
     const sizeTotals = {};
@@ -3185,11 +3500,19 @@ async function loadReports() {
     const restockedBySupply = {};
     restockLogs.forEach(l => { restockedBySupply[l.supply_id] = (restockedBySupply[l.supply_id] || 0) + Number(l.change_qty); });
 
+    // Days covered by the current range, for a daily-usage-rate estimate
+    const daysInRange = currentReportRange === 'today' ? 1 : currentReportRange === 'week' ? 7
+      : Math.max(1, (Date.now() - new Date(Math.min(...txns.map(t=>new Date(t.created_at).getTime()), Date.now())).getTime()) / 86400000);
+
     const suppliesWithActivity = allSupplies.filter(s => usedBySupply[s.id] || restockedBySupply[s.id]);
     document.getElementById('inv-supplies-usage').innerHTML = suppliesWithActivity.length ? suppliesWithActivity.map(s => {
       const used = usedBySupply[s.id] || 0;
       const restocked = restockedBySupply[s.id] || 0;
       const cost = used * Number(s.unit_cost);
+      const dailyRate = used / daysInRange;
+      const daysLeft = dailyRate > 0 ? Number(s.quantity_on_hand) / dailyRate : null;
+      const daysLeftText = daysLeft === null ? '—' : (daysLeft < 1 ? '<1 day' : `~${Math.floor(daysLeft)} day${Math.floor(daysLeft)!==1?'s':''}`);
+      const daysLeftCls = daysLeft !== null && daysLeft <= 3 ? 'text-error font-semibold' : (daysLeft !== null && daysLeft <= 7 ? 'text-warning font-semibold' : 'text-on-surface-variant');
       return `
         <tr class="border-b border-outline-variant/10">
           <td class="py-2 pr-4 font-medium text-primary">${s.name}</td>
@@ -3197,9 +3520,24 @@ async function loadReports() {
           <td class="py-2 pr-4 text-right">${restocked.toFixed(2)} ${s.unit}</td>
           <td class="py-2 pr-4 text-right">${fmt(cost)}</td>
           <td class="py-2 pr-4 text-right font-semibold">${Number(s.quantity_on_hand).toFixed(2)} ${s.unit}</td>
+          <td class="py-2 pr-4 text-right ${daysLeftCls}">${daysLeftText}</td>
         </tr>
       `;
-    }).join('') : `<tr><td colspan="5" class="py-6 text-center text-sm text-on-surface-variant">No supply activity in this period.</td></tr>`;
+    }).join('') : `<tr><td colspan="6" class="py-6 text-center text-sm text-on-surface-variant">No supply activity in this period.</td></tr>`;
+
+    // Waste / spoilage log
+    let wasteQuery = sb.from('supply_logs').select('*, supplies(name,unit)').eq('reason', 'waste').order('created_at', { ascending: false });
+    if (start) wasteQuery = wasteQuery.gte('created_at', start.toISOString());
+    const { data: wasteLogs, error: wErr } = await wasteQuery;
+    if (wErr) throw wErr;
+    document.getElementById('inv-waste-log').innerHTML = (wasteLogs && wasteLogs.length) ? wasteLogs.map(w => `
+      <tr class="border-b border-outline-variant/10">
+        <td class="py-2 pr-4 font-medium text-primary">${w.supplies?.name || 'Unknown'}</td>
+        <td class="py-2 pr-4 text-right">${Math.abs(Number(w.change_qty)).toFixed(2)} ${w.supplies?.unit || ''}</td>
+        <td class="py-2 pr-4 text-on-surface-variant text-xs">${w.notes || '—'}</td>
+        <td class="py-2 pr-4 text-on-surface-variant text-xs">${new Date(w.created_at).toLocaleDateString([], { month:'short', day:'numeric' })}</td>
+      </tr>
+    `).join('') : `<tr><td colspan="4" class="py-6 text-center text-sm text-on-surface-variant">No waste logged in this period.</td></tr>`;
 
   } catch (e) {
     console.error(e);
@@ -3240,6 +3578,61 @@ async function saveExpense() {
   } catch (e) {
     console.error(e);
     showToast('Failed to save expense', 'error', true);
+  }
+}
+
+// ===================================================================
+// CASH RECONCILIATION
+// ===================================================================
+let reconcileExpectedAmount = 0;
+
+async function openCashReconcileModal() {
+  const todayStart = new Date();
+  todayStart.setHours(0,0,0,0);
+  try {
+    const { data: cashTxns, error } = await sb.from('transactions').select('total')
+      .eq('status', 'completed').eq('payment_method', 'cash').gte('created_at', todayStart.toISOString());
+    if (error) throw error;
+    reconcileExpectedAmount = (cashTxns || []).reduce((s,t) => s + Number(t.total), 0);
+    document.getElementById('reconcile-expected').textContent = fmt(reconcileExpectedAmount);
+    document.getElementById('reconcile-counted').value = '';
+    document.getElementById('reconcile-notes').value = '';
+    updateReconcileDifference();
+    document.getElementById('modal-cash-reconcile').classList.add('open');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load expected cash', 'error', true);
+  }
+}
+
+function updateReconcileDifference() {
+  const counted = parseFloat(document.getElementById('reconcile-counted').value) || 0;
+  const diff = counted - reconcileExpectedAmount;
+  const el = document.getElementById('reconcile-difference');
+  el.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
+  el.className = 'font-semibold ' + (diff === 0 ? 'text-success' : (diff < 0 ? 'text-error' : 'text-warning'));
+}
+
+async function saveCashReconciliation() {
+  const counted = parseFloat(document.getElementById('reconcile-counted').value);
+  const notes = document.getElementById('reconcile-notes').value.trim();
+  if (isNaN(counted) || counted < 0) { showToast('Enter the counted amount', 'error', true); return; }
+  try {
+    const { error } = await sb.from('cash_reconciliations').insert({
+      reconciled_date: new Date().toISOString().slice(0,10),
+      expected_amount: reconcileExpectedAmount,
+      counted_amount: counted,
+      difference: counted - reconcileExpectedAmount,
+      notes: notes || null,
+      counted_by: currentUser.id
+    });
+    if (error) throw error;
+    showToast('Cash reconciliation saved', 'check');
+    closeModal('modal-cash-reconcile');
+    loadReports();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to save reconciliation', 'error', true);
   }
 }
 
