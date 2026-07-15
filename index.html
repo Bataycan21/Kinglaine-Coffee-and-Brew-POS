@@ -238,7 +238,7 @@
         <div class="flex items-center gap-2 text-sm bg-error-container text-on-error-container px-3 py-1.5 rounded-full" id="low-stock-badge" style="display:none">
           <span class="material-symbols-outlined text-base">warning</span> <span id="low-stock-count">0</span> low stock
         </div>
-        <button onclick="openBulkResupplyModal()" class="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+        <button onclick="openBulkResupplyModal()" class="admin-only flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">local_shipping</span> Bulk Resupply
         </button>
         <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
@@ -312,24 +312,62 @@
         <h1 class="font-bold text-2xl text-primary">Staff Accounts</h1>
         <p class="text-sm text-on-surface-variant">Create and manage cashier / admin logins</p>
       </div>
-      <button onclick="openStaffFormModal()" class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+      <button onclick="openStaffFormModal()" id="staff-add-btn" class="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
         <span class="material-symbols-outlined text-lg">person_add</span> Add Staff
       </button>
     </div>
+    <div class="px-8 pt-5 flex-shrink-0">
+      <div class="flex items-center gap-2 bg-surface-container-low rounded-xl p-1 w-fit" id="staff-tabs">
+        <button onclick="setStaffTab('accounts')" class="staff-tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="accounts">Accounts</button>
+        <button onclick="setStaffTab('shifts')" class="staff-tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="shifts">Shift Log</button>
+      </div>
+    </div>
     <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
-      <div id="staff-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
-      <table class="w-full text-left" id="staff-table" style="display:none">
-        <thead>
-          <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
-            <th class="py-3 pr-4">Username</th>
-            <th class="py-3 pr-4">Full Name</th>
-            <th class="py-3 pr-4">Role</th>
-            <th class="py-3 pr-4">Status</th>
-            <th class="py-3 pr-4 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="staff-tbody"></tbody>
-      </table>
+
+      <!-- ===== ACCOUNTS TAB ===== -->
+      <div id="staff-tab-accounts">
+        <div id="staff-loading" class="flex items-center justify-center h-40"><div class="spinner"></div></div>
+        <table class="w-full text-left" id="staff-table" style="display:none">
+          <thead>
+            <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+              <th class="py-3 pr-4">Username</th>
+              <th class="py-3 pr-4">Full Name</th>
+              <th class="py-3 pr-4">Role</th>
+              <th class="py-3 pr-4">Status</th>
+              <th class="py-3 pr-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="staff-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- ===== SHIFT LOG TAB ===== -->
+      <div id="staff-tab-shifts" style="display:none">
+        <div class="bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 mb-6 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 class="font-bold text-primary mb-1">Automatic Clock-Out</h3>
+            <p class="text-xs text-on-surface-variant">Cashiers still clocked in at this time get automatically logged out. Leave blank to disable.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="auto-logout-time-input" type="time" class="bg-surface-container-lowest rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+            <button onclick="saveAutoLogoutTime()" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold">Save</button>
+          </div>
+        </div>
+        <div id="shift-log-loading" class="flex items-center justify-center h-32"><div class="spinner"></div></div>
+        <table class="w-full text-left" id="shift-log-table" style="display:none">
+          <thead>
+            <tr class="border-b border-outline-variant/30 text-xs uppercase tracking-wider text-on-surface-variant">
+              <th class="py-3 pr-4">Staff</th>
+              <th class="py-3 pr-4">Clock In</th>
+              <th class="py-3 pr-4">Clock Out</th>
+              <th class="py-3 pr-4">Duration</th>
+              <th class="py-3 pr-4">Ended By</th>
+            </tr>
+          </thead>
+          <tbody id="shift-log-tbody"></tbody>
+        </table>
+      </div>
+
     </div>
   </div>
 
@@ -654,24 +692,12 @@
       <div>
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Base Price (₱)</label>
         <input id="pf-price" type="number" min="0" step="0.01" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
-        <p class="text-xs text-on-surface-variant mt-1">Used when no size-specific price below is set.</p>
+        <p class="text-xs text-on-surface-variant mt-1">Shown on the product grid. Actual checkout price comes from the sizes below.</p>
       </div>
       <div>
-        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Size Pricing (₱) — optional, overrides Base Price per size</label>
-        <div class="grid grid-cols-3 gap-2">
-          <div>
-            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Small</label>
-            <input id="pf-price-small" type="number" min="0" step="0.01" placeholder="e.g. 95" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
-          </div>
-          <div>
-            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Medium</label>
-            <input id="pf-price-medium" type="number" min="0" step="0.01" placeholder="e.g. 110" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
-          </div>
-          <div>
-            <label class="text-[10px] text-on-surface-variant uppercase tracking-wider">Large</label>
-            <input id="pf-price-large" type="number" min="0" step="0.01" placeholder="e.g. 125" class="w-full bg-surface-container rounded-lg px-2 py-2 text-sm border border-outline-variant/30 outline-none"/>
-          </div>
-        </div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Available Sizes & Pricing (₱)</label>
+        <p class="text-xs text-on-surface-variant mb-2">Check which sizes this item comes in — e.g. a croissant might only offer Medium and Large.</p>
+        <div class="space-y-2" id="pf-size-rows"></div>
       </div>
       <div>
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Product Image</label>
@@ -984,6 +1010,9 @@ async function loadTables() {
 // AUTH STATE
 // ===================================================================
 let currentUser = null; // { id, username, full_name, role }
+let currentShiftId = null;   // open shift_logs row id for the current non-admin session
+let autoLogoutTime = null;   // 'HH:MM:SS' string from app_settings, or null if disabled
+let autoLogoutTimer = null;  // setInterval handle that checks the cutoff
 
 function usernameToEmail(username) {
   return `${username.trim().toLowerCase()}@kinglaine.pos`;
@@ -1014,6 +1043,7 @@ async function attemptLogin() {
     }
 
     currentUser = { id: profile.id, username: profile.username, full_name: profile.full_name, role: profile.role };
+    await startShiftIfCashier();
     enterApp();
   } catch (e) {
     console.error(e);
@@ -1035,6 +1065,7 @@ function enterApp() {
   applyRoleVisibility();
   tickClock();
   loadSizeOptions();
+  loadAppSettingsAndStartAutoLogoutCheck();
   showView('tables');
 }
 
@@ -1046,14 +1077,86 @@ function applyRoleVisibility() {
 }
 
 async function logout() {
+  await closeCurrentShift('manual');
   await sb.auth.signOut();
   currentUser = null;
   activeOrderKey = null;
+  if (autoLogoutTimer) { clearInterval(autoLogoutTimer); autoLogoutTimer = null; }
   document.getElementById('login-username').value = '';
   document.getElementById('login-pin').value = '';
   document.getElementById('login-error').textContent = '';
   document.getElementById('view-app').classList.remove('active');
   document.getElementById('view-login').classList.add('active');
+}
+
+// ===================================================================
+// SHIFT LOG (clock-in/out for non-admin staff)
+// ===================================================================
+
+// Called right after a successful login. Cashiers get a fresh shift_logs
+// row (clock_in = now). If they still had an open shift from an earlier
+// session that never got a clean logout (e.g. tab closed), we close that
+// stale one first so it doesn't stay open forever.
+async function startShiftIfCashier() {
+  if (!currentUser || currentUser.role === 'admin') return;
+  try {
+    const { data: stale } = await sb.from('shift_logs')
+      .select('id').eq('user_id', currentUser.id).is('clock_out', null);
+    if (stale && stale.length) {
+      await sb.from('shift_logs')
+        .update({ clock_out: new Date().toISOString(), clock_out_reason: 'forced_next_login' })
+        .in('id', stale.map(s => s.id));
+    }
+    const { data: shift, error } = await sb.from('shift_logs')
+      .insert({ user_id: currentUser.id }).select().single();
+    if (error) throw error;
+    currentShiftId = shift.id;
+  } catch (e) {
+    console.error('Failed to start shift log:', e);
+    currentShiftId = null;
+  }
+}
+
+async function closeCurrentShift(reason) {
+  if (!currentShiftId) return;
+  try {
+    await sb.from('shift_logs')
+      .update({ clock_out: new Date().toISOString(), clock_out_reason: reason })
+      .eq('id', currentShiftId);
+  } catch (e) {
+    console.error('Failed to close shift log:', e);
+  } finally {
+    currentShiftId = null;
+  }
+}
+
+async function loadAppSettingsAndStartAutoLogoutCheck() {
+  try {
+    const { data, error } = await sb.from('app_settings').select('auto_logout_time').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    autoLogoutTime = data ? data.auto_logout_time : null;
+  } catch (e) {
+    console.error('Failed to load app settings:', e);
+    autoLogoutTime = null;
+  }
+  if (autoLogoutTimer) clearInterval(autoLogoutTimer);
+  autoLogoutTimer = setInterval(checkAutoLogout, 30000);
+  checkAutoLogout();
+}
+
+// Runs every 30s while the app is open. If the signed-in user is a cashier
+// and the current time has passed the admin-configured cutoff, force a
+// logout and close their shift with reason 'auto_cutoff'.
+async function checkAutoLogout() {
+  if (!currentUser || currentUser.role === 'admin' || !autoLogoutTime) return;
+  const now = new Date();
+  const [h, m] = autoLogoutTime.split(':').map(Number);
+  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+  if (now >= cutoff) {
+    showToast('Automatically clocked out — shift end time reached', 'schedule');
+    await closeCurrentShift('auto_cutoff');
+    await logout();
+  }
 }
 
 // ===================================================================
@@ -1075,6 +1178,7 @@ let customAddonsCache = []; // all active global add-ons
 let payMethod = 'cash';
 let currentReportRange = 'today';
 let currentReportType = 'general';
+let currentStaffTab = 'accounts';
 let pendingProductImageFile = null;
 let pendingTableStatusChanges = {}; // { tableId: newStatus }
 
@@ -1107,7 +1211,7 @@ function showView(view) {
   if (view === 'inventory') loadSupplies();
   if (view === 'products') loadProductsManagement();
   if (view === 'reports') loadReports();
-  if (view === 'staff') loadStaffManagement();
+  if (view === 'staff') { setStaffTab(currentStaffTab); }
 }
 
 function tickClock() {
@@ -1486,23 +1590,28 @@ async function openCustomizeModal(p) {
   if (SIZE_OPTIONS.length === 0) await loadSizeOptions();
   customizeProduct = p;
   customQty = 1;
-  customSize = 'medium';
   customSelectedValues = {};
   document.getElementById('cust-name').textContent = p.name;
   document.getElementById('cust-base-price').textContent = fmt(p.base_price) + ' base price';
   document.getElementById('cust-qty').textContent = '1';
   document.getElementById('cust-note').value = '';
 
-  // Load this product's per-size price overrides, if any (falls back to
-  // base_price + the global size delta when a size isn't overridden)
+  // This product's available sizes + prices. If it has no product_sizes rows
+  // at all (never edited under the new size checkboxes), fall back to
+  // offering every global size at base_price + delta, same as before.
   const { data: sizePrices } = await sb.from('product_sizes').select('size_id, price').eq('product_id', p.id);
   customSizePrices = {};
   (sizePrices || []).forEach(sp => { customSizePrices[sp.size_id] = Number(sp.price); });
+  const availableSizes = (sizePrices && sizePrices.length)
+    ? SIZE_OPTIONS.filter(s => s.id in customSizePrices)
+    : SIZE_OPTIONS;
 
-  document.getElementById('cust-size-options').innerHTML = SIZE_OPTIONS.map(s => {
+  customSize = availableSizes.some(s => s.id === 'medium') ? 'medium' : (availableSizes[0]?.id || 'medium');
+
+  document.getElementById('cust-size-options').innerHTML = availableSizes.map(s => {
     const override = customSizePrices[s.id];
     const priceHint = override !== undefined ? fmt(override) : fmt(p.base_price + s.add);
-    return `<button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id==='medium'?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all flex flex-col items-center gap-0.5">
+    return `<button onclick="setCustSize('${s.id}', this)" class="size-pill ${s.id===customSize?'selected':''} py-2.5 rounded-lg border-2 border-outline-variant text-xs font-semibold transition-all flex flex-col items-center gap-0.5">
       <span>${s.label}</span><span class="text-[10px] opacity-70">${priceHint}</span>
     </button>`;
   }).join('');
@@ -1873,7 +1982,7 @@ async function loadSupplies() {
           <td class="py-3 pr-4 text-on-surface-variant uppercase text-xs">${s.unit}</td>
           <td class="py-3 pr-4 font-bold">${s.quantity_on_hand}</td>
           <td class="py-3 pr-4">${statusHtml}</td>
-          <td class="py-3 pr-4">
+          <td class="py-3 pr-4 admin-only ${currentUser.role!=='admin'?'role-hidden':''}">
             <button onclick="openRestockSupplyModal('${s.id}','${s.name.replace(/'/g,"\\'")}','${s.unit}')" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
               <span class="material-symbols-outlined text-sm">add_box</span> Restock
             </button>
@@ -2128,17 +2237,19 @@ async function openProductFormModal(product) {
   document.getElementById('pf-price').value = product ? product.base_price : '';
   document.getElementById('pf-image').value = product ? (product.image_url || '') : '';
   document.getElementById('pf-is-active').checked = product ? product.is_active : true;
-  document.getElementById('pf-price-small').value = '';
-  document.getElementById('pf-price-medium').value = '';
-  document.getElementById('pf-price-large').value = '';
 
+  if (SIZE_OPTIONS.length === 0) await loadSizeOptions();
+  let existingSizes = [];
   if (product) {
-    const { data: sizePrices } = await sb.from('product_sizes').select('size_id, price').eq('product_id', product.id);
-    (sizePrices || []).forEach(sp => {
-      const el = document.getElementById(`pf-price-${sp.size_id}`);
-      if (el) el.value = sp.price;
-    });
+    const { data } = await sb.from('product_sizes').select('size_id, price').eq('product_id', product.id);
+    existingSizes = data || [];
   }
+  // Legacy/new products with no product_sizes rows yet default to "all sizes enabled"
+  // (matches the old fallback behavior); once saved, only the checked sizes remain offered.
+  const enabledIds = existingSizes.length ? existingSizes.map(s => s.size_id) : SIZE_OPTIONS.map(s => s.id);
+  const priceById = {};
+  existingSizes.forEach(s => { priceById[s.size_id] = s.price; });
+  renderPfSizeRows(enabledIds, priceById, product);
 
   pendingProductImageFile = null;
   document.getElementById('pf-image-file').value = '';
@@ -2155,6 +2266,30 @@ async function openProductFormModal(product) {
   }
 
   document.getElementById('modal-product-form').classList.add('open');
+}
+
+function renderPfSizeRows(enabledIds, priceById, product) {
+  const container = document.getElementById('pf-size-rows');
+  container.innerHTML = SIZE_OPTIONS.map(s => {
+    const checked = enabledIds.includes(s.id);
+    const priceVal = priceById[s.id] !== undefined
+      ? priceById[s.id]
+      : (product ? (Number(product.base_price) + s.add).toFixed(2) : '');
+    return `
+      <div class="flex items-center gap-2 bg-surface-container rounded-lg px-3 py-2">
+        <input type="checkbox" id="pf-size-enabled-${s.id}" class="w-4 h-4 accent-secondary" onchange="togglePfSizeRow('${s.id}')" ${checked ? 'checked' : ''}/>
+        <span class="flex-1 text-sm font-medium">${s.label}</span>
+        <input type="number" min="0" step="0.01" id="pf-size-price-${s.id}" value="${priceVal}" placeholder="Price"
+          class="w-24 bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2 py-1.5 text-sm outline-none disabled:opacity-40"
+          ${checked ? '' : 'disabled'}/>
+      </div>
+    `;
+  }).join('');
+}
+
+function togglePfSizeRow(sizeId) {
+  const enabled = document.getElementById(`pf-size-enabled-${sizeId}`).checked;
+  document.getElementById(`pf-size-price-${sizeId}`).disabled = !enabled;
 }
 
 function handleProductImageSelect(event) {
@@ -2187,14 +2322,18 @@ async function saveProductForm() {
   const price = parseFloat(document.getElementById('pf-price').value);
   let image_url = document.getElementById('pf-image').value.trim();
   const is_active = document.getElementById('pf-is-active').checked;
-  const sizePriceInputs = {
-    small: document.getElementById('pf-price-small').value,
-    medium: document.getElementById('pf-price-medium').value,
-    large: document.getElementById('pf-price-large').value
-  };
+
+  const sizeSelections = SIZE_OPTIONS.map(s => ({
+    sizeId: s.id,
+    enabled: document.getElementById(`pf-size-enabled-${s.id}`).checked,
+    priceVal: document.getElementById(`pf-size-price-${s.id}`).value
+  }));
 
   if (!name) { showToast('Name is required', 'error', true); return; }
   if (isNaN(price) || price < 0) { showToast('Enter a valid price', 'error', true); return; }
+  if (!sizeSelections.some(s => s.enabled)) { showToast('Select at least one size', 'error', true); return; }
+  const badSize = sizeSelections.find(s => s.enabled && (s.priceVal === '' || isNaN(parseFloat(s.priceVal)) || parseFloat(s.priceVal) < 0));
+  if (badSize) { showToast('Enter a valid price for every checked size', 'error', true); return; }
 
   try {
     if (pendingProductImageFile) {
@@ -2218,16 +2357,16 @@ async function saveProductForm() {
       showToast('Product created — add its ingredients in Recipe', 'check');
     }
 
-    // Save per-size price overrides: a filled field upserts a price, an
-    // emptied field removes the override (falling back to Base Price + global delta)
-    for (const [sizeId, val] of Object.entries(sizePriceInputs)) {
-      if (val === '') {
-        await sb.from('product_sizes').delete().eq('product_id', productId).eq('size_id', sizeId);
-      } else {
+    // Sizes: a checked box upserts that size's availability + price; an
+    // unchecked box removes it entirely, so it won't be offered at checkout.
+    for (const { sizeId, enabled, priceVal } of sizeSelections) {
+      if (enabled) {
         await sb.from('product_sizes').upsert(
-          { product_id: productId, size_id: sizeId, price: parseFloat(val) },
+          { product_id: productId, size_id: sizeId, price: parseFloat(priceVal) },
           { onConflict: 'product_id,size_id' }
         );
+      } else {
+        await sb.from('product_sizes').delete().eq('product_id', productId).eq('size_id', sizeId);
       }
     }
 
@@ -2683,6 +2822,19 @@ async function removeAddon(id) {
 // ===================================================================
 // STAFF MANAGEMENT (admin only)
 // ===================================================================
+function setStaffTab(tab) {
+  currentStaffTab = tab;
+  document.querySelectorAll('.staff-tab-btn').forEach(b => {
+    b.classList.toggle('bg-primary', b.dataset.tab === tab);
+    b.classList.toggle('text-white', b.dataset.tab === tab);
+  });
+  document.getElementById('staff-tab-accounts').style.display = tab === 'accounts' ? 'block' : 'none';
+  document.getElementById('staff-tab-shifts').style.display = tab === 'shifts' ? 'block' : 'none';
+  document.getElementById('staff-add-btn').style.display = tab === 'accounts' ? 'flex' : 'none';
+  if (tab === 'accounts') loadStaffManagement();
+  if (tab === 'shifts') loadShiftLog();
+}
+
 async function loadStaffManagement() {
   document.getElementById('staff-loading').style.display = 'flex';
   document.getElementById('staff-table').style.display = 'none';
@@ -2711,6 +2863,62 @@ async function loadStaffManagement() {
   } finally {
     document.getElementById('staff-loading').style.display = 'none';
     document.getElementById('staff-table').style.display = 'table';
+  }
+}
+
+// ---- Shift Log tab: automatic clock-out setting + per-cashier clock in/out history ----
+async function loadShiftLog() {
+  document.getElementById('shift-log-loading').style.display = 'flex';
+  document.getElementById('shift-log-table').style.display = 'none';
+
+  document.getElementById('auto-logout-time-input').value = autoLogoutTime ? autoLogoutTime.slice(0,5) : '';
+
+  try {
+    const { data: shifts, error } = await sb.from('shift_logs')
+      .select('*, users(full_name, username)')
+      .order('clock_in', { ascending: false })
+      .limit(200);
+    if (error) throw error;
+
+    const reasonLabel = { manual: 'Logged out', auto_cutoff: 'Auto clock-out', forced_next_login: 'Closed on next login' };
+    document.getElementById('shift-log-tbody').innerHTML = shifts.length ? shifts.map(s => {
+      const clockIn = new Date(s.clock_in);
+      const clockOut = s.clock_out ? new Date(s.clock_out) : null;
+      const durationMs = (clockOut || new Date()) - clockIn;
+      const hours = Math.floor(durationMs / 3600000);
+      const mins = Math.floor((durationMs % 3600000) / 60000);
+      const durationLabel = `${hours}h ${mins}m${clockOut ? '' : ' (ongoing)'}`;
+      return `
+        <tr class="border-b border-outline-variant/10">
+          <td class="py-3 pr-4 font-medium">${s.users?.full_name || 'Unknown'} <span class="text-on-surface-variant text-xs">(${s.users?.username || ''})</span></td>
+          <td class="py-3 pr-4">${clockIn.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
+          <td class="py-3 pr-4">${clockOut ? clockOut.toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '<span class="stock-pill bg-success/10 text-success">Still clocked in</span>'}</td>
+          <td class="py-3 pr-4">${durationLabel}</td>
+          <td class="py-3 pr-4 text-xs text-on-surface-variant">${s.clock_out ? (reasonLabel[s.clock_out_reason] || '—') : '—'}</td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="5" class="py-6 text-center text-sm text-on-surface-variant">No shifts recorded yet.</td></tr>`;
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to load shift log', 'error', true);
+  } finally {
+    document.getElementById('shift-log-loading').style.display = 'none';
+    document.getElementById('shift-log-table').style.display = 'table';
+  }
+}
+
+async function saveAutoLogoutTime() {
+  const val = document.getElementById('auto-logout-time-input').value; // 'HH:MM' or ''
+  try {
+    const { error } = await sb.from('app_settings')
+      .update({ auto_logout_time: val || null, updated_at: new Date().toISOString() })
+      .eq('id', 1);
+    if (error) throw error;
+    autoLogoutTime = val ? val + ':00' : null;
+    showToast(val ? `Auto clock-out set to ${val}` : 'Auto clock-out disabled', 'check');
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to save setting', 'error', true);
   }
 }
 
