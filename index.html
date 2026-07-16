@@ -262,6 +262,7 @@
             <th class="py-3 pr-4">On Hand</th>
             <th class="py-3 pr-4">Status</th>
             <th class="py-3 pr-4">Restock</th>
+            <th class="py-3 pr-4 admin-only">Edit</th>
             <th class="py-3 pr-4 admin-only text-right">Remove</th>
           </tr>
         </thead>
@@ -759,7 +760,7 @@
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Category</label>
         <select id="pf-category" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none">
           <option value="coffee">Coffee</option>
-          <option value="tea">Tea</option>
+          <option value="tea">Iced Drinks</option>
           <option value="bakery">Bakery</option>
           <option value="frappe">Frappe</option>
         </select>
@@ -907,6 +908,31 @@
     </div>
     <div class="p-6 border-t border-outline-variant/20">
       <button onclick="saveSupplyForm()" id="save-supply-btn" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Add Supply</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: EDIT SUPPLY (admin only — set on-hand qty & low stock threshold) ===== -->
+<div class="modal-overlay" id="modal-edit-supply">
+  <div class="bg-surface-container-lowest rounded-2xl w-[400px] shadow-2xl">
+    <div class="p-6 border-b border-outline-variant/20 flex justify-between items-center">
+      <h3 class="font-bold text-xl text-primary">Edit <span id="edit-supply-name"></span></h3>
+      <button onclick="closeModal('modal-edit-supply')" class="p-1 hover:bg-surface-container rounded-full"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input type="hidden" id="edit-supply-id"/>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">On Hand (<span id="edit-supply-unit"></span>)</label>
+        <input id="edit-supply-qty" type="number" min="0" step="0.01" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Low Stock Threshold</label>
+        <input id="edit-supply-threshold" type="number" min="0" step="0.01" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none"/>
+      </div>
+      <p id="edit-supply-error" class="text-error text-xs font-semibold h-4"></p>
+    </div>
+    <div class="p-6 border-t border-outline-variant/20">
+      <button onclick="saveEditSupply()" id="save-edit-supply-btn" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">Save Changes</button>
     </div>
   </div>
 </div>
@@ -1167,7 +1193,7 @@ async function loadSizeOptions() {
 // the database (option_groups/option_values and addons) — see openCustomizeModal().
 const CATEGORIES = [
   { id:'coffee', label:'Coffee', icon:'coffee' },
-  { id:'tea', label:'Tea', icon:'local_drink' },
+  { id:'tea', label:'Iced Drinks', icon:'local_drink' },
   { id:'bakery', label:'Bakery', icon:'bakery_dining' },
   { id:'frappe', label:'Frappe', icon:'icecream' }
 ];
@@ -2227,6 +2253,11 @@ async function loadSupplies() {
               <span class="material-symbols-outlined text-sm">add_box</span> Restock
             </button>
           </td>
+          <td class="py-3 pr-4 admin-only ${currentUser.role!=='admin'?'role-hidden':''}">
+            <button onclick="openEditSupplyModal('${s.id}','${s.name.replace(/'/g,"\\'")}','${s.unit}',${s.quantity_on_hand},${s.low_stock_threshold})" class="text-secondary font-semibold text-xs hover:underline flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">edit</span> Edit
+            </button>
+          </td>
           <td class="py-3 pr-4 admin-only text-right ${currentUser.role!=='admin'?'role-hidden':''}">
             <button onclick="removeSupply('${s.id}','${s.name.replace(/'/g,"\\'")}')" class="text-error hover:bg-error/10 rounded-full p-1.5">
               <span class="material-symbols-outlined text-base">delete</span>
@@ -2286,6 +2317,63 @@ async function saveSupplyForm() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Add Supply';
+  }
+}
+
+// ---------------------------------------------------------------
+// EDIT SUPPLY (admin only) — directly set on-hand qty & low stock threshold,
+// as opposed to Restock which only adds to the existing quantity.
+// ---------------------------------------------------------------
+function openEditSupplyModal(supplyId, supplyName, unit, qty, threshold) {
+  if (currentUser.role !== 'admin') return;
+  document.getElementById('edit-supply-id').value = supplyId;
+  document.getElementById('edit-supply-name').textContent = supplyName;
+  document.getElementById('edit-supply-unit').textContent = unit;
+  document.getElementById('edit-supply-qty').value = qty;
+  document.getElementById('edit-supply-threshold').value = threshold;
+  document.getElementById('edit-supply-error').textContent = '';
+  document.getElementById('modal-edit-supply').classList.add('open');
+}
+
+async function saveEditSupply() {
+  const supplyId   = document.getElementById('edit-supply-id').value;
+  const newQty     = parseFloat(document.getElementById('edit-supply-qty').value);
+  const newThresh  = parseFloat(document.getElementById('edit-supply-threshold').value);
+  const errEl      = document.getElementById('edit-supply-error');
+  errEl.textContent = '';
+
+  if (isNaN(newQty) || newQty < 0)      { errEl.textContent = 'Enter a valid on-hand quantity.'; return; }
+  if (isNaN(newThresh) || newThresh < 0) { errEl.textContent = 'Enter a valid low stock threshold.'; return; }
+
+  const btn = document.getElementById('save-edit-supply-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const { data: row, error: fetchErr } = await sb.from('supplies').select('quantity_on_hand').eq('id', supplyId).single();
+    if (fetchErr) throw fetchErr;
+
+    const { error: updErr } = await sb.from('supplies')
+      .update({ quantity_on_hand: newQty, low_stock_threshold: newThresh, updated_at: new Date().toISOString() })
+      .eq('id', supplyId);
+    if (updErr) throw updErr;
+
+    const diff = newQty - Number(row.quantity_on_hand);
+    if (diff !== 0) {
+      await sb.from('supply_logs').insert({
+        supply_id: supplyId, change_qty: diff, reason: 'adjustment',
+        performed_by: currentUser.id, notes: 'Manual edit via Inventory > Edit'
+      });
+    }
+
+    showToast('Supply updated', 'check');
+    closeModal('modal-edit-supply');
+    loadSupplies();
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = 'Failed to update supply.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
   }
 }
 
@@ -3454,7 +3542,7 @@ async function loadReports() {
       const cat = categoryById[i.product_id] || 'other';
       categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(i.line_total);
     });
-    const categoryLabels = { coffee: 'Coffee', tea: 'Tea', bakery: 'Bakery', frappe: 'Frappe', other: 'Other' };
+    const categoryLabels = { coffee: 'Coffee', tea: 'Iced Drinks', bakery: 'Bakery', frappe: 'Frappe', other: 'Other' };
     document.getElementById('rep-category-breakdown').innerHTML = Object.keys(categoryTotals).length
       ? Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([cat,total]) => `
         <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium">${categoryLabels[cat]||cat}</span><span class="text-on-surface-variant font-semibold">${fmt(total)}</span></div>

@@ -13,7 +13,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 /* ===== CATEGORY METADATA (display copy only — not product data) ===== */
 const CATEGORY_META = {
   coffee: { title: 'Signature Coffee', desc: 'Ethically sourced, small-batch roasted beans curated for the ultimate sensory experience.' },
-  tea:    { title: 'Artisan Teas',     desc: 'Carefully sourced whole-leaf teas and seasonal blends, steeped to perfection.' },
+  tea:    { title: 'Iced Drinks',      desc: 'Refreshing chilled sips and cold-brewed blends, perfect for warm afternoons.' },
   bakery: { title: 'The Bakery',       desc: 'Hand-crafted pastries baked fresh each morning from stone-milled flour.' },
   frappe: { title: 'Frappes',          desc: 'Blended, chilled, and finished with all the toppings.' }
 };
