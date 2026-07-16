@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script id="tailwind-config">
   tailwind.config = {
     darkMode: "class",
@@ -739,6 +740,7 @@
     <h3 class="font-bold text-2xl text-primary mb-2">Payment Complete</h3>
     <p class="text-sm text-on-surface-variant mb-6" id="receipt-summary">Order total ₱0.00 paid via Cash.</p>
     <div class="bg-surface-container rounded-xl p-4 text-left text-sm mb-6 font-mono" id="receipt-detail"></div>
+    <div class="mb-6" id="receipt-claim-qr"></div>
     <button onclick="closeReceiptAndReset()" class="w-full py-3 bg-primary text-white rounded-xl font-semibold active:scale-95 transition-all">New Order</button>
   </div>
 </div>
@@ -1179,6 +1181,8 @@
 const SUPABASE_URL = 'https://vgprkfxmeioxevtocenp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZncHJrZnhtZWlveGV2dG9jZW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwNzM3NjMsImV4cCI6MjA4NzY0OTc2M30.KoPJ4JXgPtZ13OHAwYVukfyWQykWJ2Gzr3CAWIBuSkA';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// TODO: replace with your real deployed website domain.
+const CLAIM_BASE_URL = 'https://kinglaine-coffee-and-brew-main.vercel.app/';
 
 const TAX_RATE = 0.12;
 const CURRENCY = 'PHP ';
@@ -2132,6 +2136,15 @@ function generateReceiptNumber() {
   return `KG-${ymd}-${rand}`;
 }
 
+// 8-char alphanumeric claim code, e.g. "AB12CD34" — ~2.8 trillion possible
+// values, so collisions are practically impossible even without a retry loop.
+function generateClaimCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid mis-reads
+  let code = '';
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 async function completePayment() {
   const ticket = getActiveTicket();
   if (!ticket || ticket.items.length === 0) return;
@@ -2170,6 +2183,17 @@ async function completePayment() {
     }).select().single();
     if (txnErr) throw txnErr;
 
+    // 1b. Generate this order's one-time beans-claim code and QR.
+    //     `claimed` starts false; it can only ever flip via the
+    //     claim_order_beans() database function the customer's browser calls.
+    const claimCode = generateClaimCode();
+    const { error: claimErr } = await sb.from('claim_codes').insert({
+      transaction_id: txn.id,
+      code: claimCode
+    });
+    if (claimErr) console.error('Claim code save failed:', claimErr); // don't block the sale on this
+    const claimUrl = `${CLAIM_BASE_URL}?claim=${claimCode}`;
+
     // 2. Insert line items
     const lineItems = ticket.items.map(i => ({
       transaction_id: txn.id,
@@ -2204,6 +2228,23 @@ async function completePayment() {
     detailHtml += `<br/><br/>Subtotal: ${fmt(totals.subtotal)}<br/>Discount: -${fmt(totals.discountAmt)}<br/>Tax: ${fmt(totals.tax)}<br/><strong>Total: ${fmt(totals.total)}</strong>`;
     if (payMethod === 'cash') detailHtml += `<br/>Tendered: ${fmt(tendered)}<br/>Change: ${fmt(change)}`;
     document.getElementById('receipt-detail').innerHTML = detailHtml;
+
+    const qrWrap = document.getElementById('receipt-claim-qr');
+    if (qrWrap) {
+      qrWrap.innerHTML = ''; // clear any QR from a previous sale
+      if (!claimErr) {
+        const qrBox = document.createElement('div');
+        qrBox.className = 'flex justify-center';
+        qrWrap.appendChild(qrBox);
+        // Renders a <canvas> locally — the code and URL never leave this device.
+        new QRCode(qrBox, { text: claimUrl, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M });
+        const caption = document.createElement('p');
+        caption.className = 'text-xs text-on-surface-variant mt-2';
+        caption.textContent = 'Scan to claim beans for this order';
+        qrWrap.appendChild(caption);
+      }
+      // silently omit if the claim code failed to save
+    }
 
     closeModal('modal-payment');
     document.getElementById('modal-receipt').classList.add('open');
