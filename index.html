@@ -1197,6 +1197,10 @@ const CATEGORIES = [
   { id:'bakery', label:'Bakery', icon:'bakery_dining' },
   { id:'frappe', label:'Frappe', icon:'icecream' }
 ];
+// Single source of truth for how each category value is displayed anywhere
+// in the admin UI (Products list, Reports breakdown, etc.) — the underlying
+// `category` column values stay stable in the database.
+const PRODUCT_CATEGORY_LABELS = { coffee: 'Coffee', tea: 'Iced Drinks', bakery: 'Bakery', frappe: 'Frappe', other: 'Other' };
 let TABLES = []; // populated from public.restaurant_tables — { id, label, status, is_deleted }
 
 async function loadTables() {
@@ -2597,7 +2601,7 @@ async function loadProductsManagement() {
       <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low/50">
         <td class="py-2 pr-4"><img src="${p.image_url||''}" class="w-10 h-10 rounded-lg object-cover bg-surface-container" onerror="this.style.opacity=0.2"/></td>
         <td class="py-2 pr-4 font-medium text-primary">${p.name}</td>
-        <td class="py-2 pr-4 capitalize text-on-surface-variant">${p.category}</td>
+        <td class="py-2 pr-4 capitalize text-on-surface-variant">${PRODUCT_CATEGORY_LABELS[p.category] || p.category}</td>
         <td class="py-2 pr-4 text-xs">${priceDisplay}</td>
         <td class="py-2 pr-4">${p.is_active ? `<span class="stock-pill bg-success/10 text-success">Active</span>` : `<span class="stock-pill bg-outline-variant/20 text-on-surface-variant">Hidden</span>`}</td>
         <td class="py-2 pr-4"><span class="stock-pill ${badge.cls}">${badge.label}</span></td>
@@ -3542,10 +3546,9 @@ async function loadReports() {
       const cat = categoryById[i.product_id] || 'other';
       categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(i.line_total);
     });
-    const categoryLabels = { coffee: 'Coffee', tea: 'Iced Drinks', bakery: 'Bakery', frappe: 'Frappe', other: 'Other' };
     document.getElementById('rep-category-breakdown').innerHTML = Object.keys(categoryTotals).length
       ? Object.entries(categoryTotals).sort((a,b)=>b[1]-a[1]).map(([cat,total]) => `
-        <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium">${categoryLabels[cat]||cat}</span><span class="text-on-surface-variant font-semibold">${fmt(total)}</span></div>
+        <div class="flex justify-between items-center text-sm"><span class="text-primary font-medium">${PRODUCT_CATEGORY_LABELS[cat]||cat}</span><span class="text-on-surface-variant font-semibold">${fmt(total)}</span></div>
       `).join('') : `<p class="text-sm text-on-surface-variant">No sales in this period.</p>`;
 
     // Sales per cashier
