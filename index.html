@@ -114,13 +114,13 @@
       <span class="font-bold text-lg tracking-tight">Kinglaine POS</span>
     </div>
     <div class="flex items-center gap-5">
-      <button onclick="showView('tables')" id="nav-tables" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+      <button onclick="showView('tables')" id="nav-tables" class="nav-top floor-nav flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
         <span class="material-symbols-outlined text-lg">table_restaurant</span> Dine In
       </button>
-      <button onclick="showView('takeout')" id="nav-takeout" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+      <button onclick="showView('takeout')" id="nav-takeout" class="nav-top floor-nav flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
         <span class="material-symbols-outlined text-lg">shopping_bag</span> Take Out
       </button>
-      <button onclick="handleOrderNavClick()" id="nav-order" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
+      <button onclick="handleOrderNavClick()" id="nav-order" class="nav-top floor-nav flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
         <span class="material-symbols-outlined text-lg">shopping_cart</span> Order
       </button>
       <button onclick="showView('inventory')" id="nav-inventory" class="nav-top flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-white/10 transition-colors">
@@ -238,13 +238,13 @@
         <div class="flex items-center gap-2 text-sm bg-error-container text-on-error-container px-3 py-1.5 rounded-full" id="low-stock-badge" style="display:none">
           <span class="material-symbols-outlined text-base">warning</span> <span id="low-stock-count">0</span> low stock
         </div>
-        <button onclick="openBulkResupplyModal()" class="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
+        <button onclick="openBulkResupplyModal()" class="inv-write flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">local_shipping</span> Bulk Resupply
         </button>
-        <button onclick="openLogWasteModal()" class="flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-error hover:text-error transition-all active:scale-95">
+        <button onclick="openLogWasteModal()" class="inv-write flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-error hover:text-error transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">delete_sweep</span> Log Waste
         </button>
-        <button onclick="openSupplyFormModal()" id="add-supply-btn" class="admin-only flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
+        <button onclick="openSupplyFormModal()" id="add-supply-btn" class="inv-write flex items-center gap-2 border-2 border-outline-variant px-4 py-2.5 rounded-xl font-semibold text-sm hover:border-secondary transition-all active:scale-95">
           <span class="material-symbols-outlined text-lg">add</span> Add Supply
         </button>
         <button onclick="loadSupplies()" class="text-xs font-semibold text-secondary hover:underline flex items-center gap-1">
@@ -838,6 +838,7 @@
         <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant block mb-1">Role</label>
         <select id="sf-role" class="w-full bg-surface-container rounded-lg px-3 py-2 text-sm border border-outline-variant/30 outline-none">
           <option value="cashier">Cashier</option>
+          <option value="inventory">Inventory</option>
           <option value="admin">Admin</option>
         </select>
       </div>
@@ -1244,13 +1245,22 @@ function enterApp() {
   tickClock();
   loadSizeOptions();
   loadAppSettingsAndStartAutoLogoutCheck();
-  showView('tables');
+  showView(currentUser.role === 'inventory' ? 'inventory' : 'tables');
 }
 
 function applyRoleVisibility() {
   const isAdmin = currentUser.role === 'admin';
+  const isInventory = currentUser.role === 'inventory';
   document.querySelectorAll('.admin-only').forEach(el => {
     el.classList.toggle('role-hidden', !isAdmin);
+  });
+  // Bulk Resupply, Log Waste, Add Supply: admin or inventory staff — never cashier.
+  document.querySelectorAll('.inv-write').forEach(el => {
+    el.classList.toggle('role-hidden', !(isAdmin || isInventory));
+  });
+  // Inventory staff only handle the Inventory tab — hide Dine In / Take Out / Order.
+  document.querySelectorAll('.floor-nav').forEach(el => {
+    el.classList.toggle('role-hidden', isInventory);
   });
 }
 
@@ -1381,7 +1391,12 @@ function showView(view) {
 
   if ((view === 'products' || view === 'reports' || view === 'staff') && currentUser.role !== 'admin') {
     showToast('Admin access required', 'lock');
-    showView('tables');
+    showView(currentUser.role === 'inventory' ? 'inventory' : 'tables');
+    return;
+  }
+  if ((view === 'tables' || view === 'takeout' || view === 'order') && currentUser.role === 'inventory') {
+    showToast('Inventory staff have access to the Inventory tab only', 'lock');
+    showView('inventory');
     return;
   }
 
@@ -3158,7 +3173,13 @@ async function loadStaffManagement() {
       <tr class="border-b border-outline-variant/10">
         <td class="py-3 pr-4 font-medium">${u.username}</td>
         <td class="py-3 pr-4">${u.full_name}</td>
-        <td class="py-3 pr-4 capitalize">${u.role}</td>
+        <td class="py-3 pr-4">
+          <select onchange="updateStaffRole('${u.id}', this.value, '${u.username.replace(/'/g,"\\'")}', '${u.role}')" class="capitalize bg-transparent border border-outline-variant/30 rounded-lg px-2 py-1 text-sm outline-none hover:border-secondary transition-colors">
+            <option value="cashier" ${u.role === 'cashier' ? 'selected' : ''}>Cashier</option>
+            <option value="inventory" ${u.role === 'inventory' ? 'selected' : ''}>Inventory</option>
+            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+          </select>
+        </td>
         <td class="py-3 pr-4">
           <span class="stock-pill ${u.is_active ? 'bg-success/15 text-success' : 'bg-error/15 text-error'}">${u.is_active ? 'Active' : 'Disabled'}</span>
         </td>
@@ -3202,10 +3223,11 @@ async function saveStaffForm() {
   btn.disabled = true;
   btn.textContent = 'Creating…';
   try {
-    const { error } = await sb.auth.signUp({
-      email: usernameToEmail(username),
-      password: pin,
-      options: { data: { username, full_name: fullName, role } }
+    const { error } = await sb.rpc('admin_create_staff_account', {
+      p_username: username,
+      p_full_name: fullName,
+      p_pin: pin,
+      p_role: role
     });
     if (error) { errEl.textContent = error.message; return; }
     showToast('Staff account created', 'check');
@@ -3229,6 +3251,35 @@ async function toggleStaffActive(id, currentlyActive) {
   } catch (e) {
     console.error(e);
     showToast('Update failed', 'error', true);
+  }
+}
+
+// Changes a staff member's role/position (e.g. Cashier -> Inventory).
+// Guards against an admin accidentally demoting themselves and getting
+// locked out of the admin-only screens mid-session.
+async function updateStaffRole(id, newRole, username, oldRole) {
+  if (newRole === oldRole) return;
+  if (id === currentUser.id && newRole !== 'admin') {
+    if (!confirm(`This changes YOUR OWN role from Admin to ${newRole}. You'll lose access to Products, Reports, and Staff management immediately. Continue?`)) {
+      loadStaffManagement();
+      return;
+    }
+  }
+  try {
+    const { error } = await sb.from('users').update({ role: newRole }).eq('id', id);
+    if (error) throw error;
+    showToast(`${username}'s role set to ${newRole}`, 'check');
+    if (id === currentUser.id) {
+      currentUser.role = newRole;
+      applyRoleVisibility();
+      document.getElementById('current-user-label').textContent = currentUser.full_name + ' (' + currentUser.role + ')';
+      if (newRole !== 'admin') showView(newRole === 'inventory' ? 'inventory' : 'tables');
+    }
+    loadStaffManagement();
+  } catch (e) {
+    console.error(e);
+    showToast('Failed to update role', 'error', true);
+    loadStaffManagement();
   }
 }
 
